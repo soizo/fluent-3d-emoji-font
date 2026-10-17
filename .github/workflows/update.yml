@@ -32,7 +32,7 @@ jobs:
         run: fluent-font --upstream work/upstream --output dist
       - name: Summary
         run: cat dist/RELEASE.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: verified-fonts
           path: dist/
@@ -50,7 +50,7 @@ jobs:
           path: dist
       - name: Native CoreText smoke test
         run: swift scripts/check_macos.swift dist/Fluent3D-sbix.ttf preview.png
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-preview
           path: preview.png
