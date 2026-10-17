@@ -143,8 +143,10 @@ def run(args):
     identity = digest(canonical(identity_data))
     tag = 'v0.4-' + identity[:20]
     checked = datetime.now(timezone.utc).isoformat()
+    upstream_checked = (snapshot.get('upstream_checked_at', snapshot['checked_at']) if snapshot else checked)
     report = dict(schema_version=2, font_version='0.4.0', content_id=identity, tag=tag, checked_at=checked,
                   selected_source='emojipedia', publishable=publishable,
+                  source_mode='saved_snapshot' if snapshot else 'upstream', upstream_checked_at=upstream_checked,
                   build_status='verified' if publishable else 'local_unverified',
                   unicode_version=unicode_version, unicode_sha256=digest(unicode_raw),
                   latest_reference=candidates['release'],
@@ -185,6 +187,8 @@ def run(args):
              + ('For this companion variant, select Fluent 3D Community 440 or Fluent 3D Community 440 SVG. ' if crop_size == 440 else '') + '\n\n'
              'Source: the selected Emojipedia Microsoft 3D Fluent catalogue only. '
              'No artwork from the older Microsoft Git repository is substituted.\n\n'
+             f'Source mode: {report["source_mode"]}; upstream observation: {upstream_checked}. '
+             'A saved-snapshot build does not check for newer upstream images.\n\n'
              f'Artwork: {len(records)}; Unicode Emoji {unicode_version} RGI coverage: '
              f'{len(required)-len(missing)}/{len(required)} ({report["rgi_coverage"]:.2%}).\n\n'
              f'Latest Emojipedia reference: {candidates["release"]["title"]}, '
