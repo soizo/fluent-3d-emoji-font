@@ -53,14 +53,22 @@ def run(args):
     out.mkdir(parents=True, exist_ok=True)
     cache = Path(args.cache)
     cache.mkdir(parents=True, exist_ok=True)
-    unicode_raw = get('https://www.unicode.org/Public/emoji/latest/emoji-test.txt').content
+    source_manifest = getattr(args, 'source_manifest', None)
+    snapshot = json.loads(Path(source_manifest).read_text()) if source_manifest else None
+    unicode_raw = ((Path(source_manifest).parent / 'emoji-test.txt').read_bytes() if snapshot else
+                   get('https://www.unicode.org/Public/emoji/latest/emoji-test.txt').content)
     unicode_version, unicode_entries = emoji_data(unicode_raw.decode('utf-8-sig'))
-    candidates = discover()
+    candidates = snapshot['candidate_inventory'] if snapshot else discover()
     write_json(cache / "reference-observation.json", candidates)
     approvals = json.loads(Path(args.approvals).read_text())
     approved = validate_approvals(candidates['records'], approvals)
     pending = sorted(set(candidates['records']) - set(approved))
     records = download_catalogue(candidates, cache, audit_only=bool(pending and not args.allow_unverified_local))
+    if snapshot:
+        actual = {k: (r['url'], r['sha256']) for k, r in records.items()}
+        expected = {k: (r['url'], r['sha256']) for k, r in snapshot['source_records'].items()}
+        if actual != expected or digest(unicode_raw) != snapshot['unicode_sha256']:
+            raise ValueError('Companion build source differs from the primary release snapshot')
     for required_case in ['1f31a', '1faea']:
         if required_case not in records:
             raise ValueError(f'Required rendering regression character missing from selected catalogue: {required_case}')
@@ -96,7 +104,9 @@ def run(args):
         print(json.dumps({k: report[k] for k in ['build_status', 'reference_count', 'publishable']}))
         return
     publishable = not pending
-    records = centre_crop(records, cache / 'cropped-473')
+    crop_size = getattr(args, 'crop_size', 473)
+    inset = (512 - crop_size) // 2
+    records = centre_crop(records, cache / f'cropped-{crop_size}', size=crop_size)
     cropped_records = {k: {a: b for a, b in v.items() if a != 'path'} for k, v in records.items()}
     aliases = mappings(records, unicode_entries)
     required = {s for s, status in unicode_entries.items() if status == 'fully-qualified'}
@@ -127,13 +137,15 @@ def run(args):
                   pending_rights_sequences=pending, unverified_reference_count=len(pending),
                   selected_catalogue_png_bytes_preserved=False,
                   image_transform=dict(operation='centre_crop', source_size=[512, 512],
-                                       box=[19, 19, 492, 492], output_size=[473, 473], resampled=False),
+                                       box=[inset, inset, inset + crop_size, inset + crop_size],
+                                       output_size=[crop_size, crop_size], resampled=False),
+                  parent_content_id=snapshot['content_id'] if snapshot else None,
                   embedded_records=cropped_records,
                   qualification_alias_count=len(aliases)-len(records),
                   extra_non_rgi_sequences=sorted(set(records)-{key(s) for s in unicode_entries}),
                   source_records=public_records, candidate_inventory=candidates,
                   implementation=implementation)
-    paths = build(records, aliases, out, identity)
+    paths = build(records, aliases, out, identity, variant='440' if crop_size == 440 else None)
     report['shaping_checks_passed'] = validate(paths, records, aliases)
     report['files'] = {p.name: digest(p.read_bytes()) for p in paths}
     write_json(out / 'manifest.json', report)
@@ -150,7 +162,8 @@ def run(args):
              'fix invisible emoji in macOS Chromium/Electron applications, including Obsidian. '
              'Replace the 0.1 font and restart the application to clear cached fonts. '
              'Use Fluent 3D Community (sbix); the SVG alternative now has the distinct '
-             'family name Fluent 3D Community SVG.\n\n'
+             'family name Fluent 3D Community SVG. '
+             + ('For this companion variant, select Fluent 3D Community 440 or Fluent 3D Community 440 SVG. ' if crop_size == 440 else '') + '\n\n'
              'Source: the selected Emojipedia Microsoft 3D Fluent catalogue only. '
              'No artwork from the older Microsoft Git repository is substituted.\n\n'
              f'Artwork: {len(records)}; Unicode Emoji {unicode_version} RGI coverage: '
@@ -158,7 +171,7 @@ def run(args):
              f'Latest Emojipedia reference: {candidates["release"]["title"]}, '
              f'asset set IDs {candidates["asset_set_ids"]}, {len(candidate_keys)} records.\n\n'
              f'All {len(candidate_keys)} selected catalogue images are included, with '
-             'centre-cropped from 512×512 to 473×473 without resampling. '
+             f'centre-cropped from 512×512 to {crop_size}×{crop_size} without resampling. '
              'Embedded PNG bytes are checked against the cropped assets; original source hashes are retained.\n\n'
              f'Redistribution status: {"verified" if publishable else "UNVERIFIED — LOCAL BUILD ONLY"}. '
              f'{len(pending)} images lack confirmed redistribution evidence.\n\n'
@@ -183,8 +196,10 @@ def main():
     parser.add_argument('--output', default='dist')
     parser.add_argument('--cache', default='work/emojipedia-assets')
     parser.add_argument('--approvals', default='licenses/approvals.json')
+    parser.add_argument('--crop-size', type=int, choices=[473, 440], default=473)
+    parser.add_argument('--source-manifest', help='Pin companion artwork and Unicode input to a primary build manifest')
     parser.add_argument('--allow-unverified-local', action='store_true',
-                        help='Build all selected artwork locally with unverified-rights notices; never publish it')
+                        help='Build all selected artwork with unverified-rights notices; does not grant publication rights')
     run(parser.parse_args())
 
 

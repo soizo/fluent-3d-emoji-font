@@ -80,10 +80,10 @@ def bounds_glyph(bounds):
     return pen.glyph()
 
 
-def set_format_names(font, identity, svg=False):
-    family = 'Fluent 3D Community' + (' SVG' if svg else '')
+def set_format_names(font, identity, svg=False, variant=None):
+    family = 'Fluent 3D Community' + (f' {variant}' if variant else '') + (' SVG' if svg else '')
     # Distinguish the new source generation from previously cached Git artwork.
-    ps_name = 'Fluent3DCommunity04' + ('SVG' if svg else '') + '-Regular'
+    ps_name = 'Fluent3DCommunity04' + (f'-{variant}' if variant else '') + ('SVG' if svg else '') + '-Regular'
     names = {1: family, 3: identity + (';svg' if svg else ';sbix'),
              4: family + ' Regular', 6: ps_name}
     for record in font['name'].names:
@@ -118,7 +118,7 @@ def mappings(records, unicode_entries):
     return result
 
 
-def base_font(records, aliases, identity):
+def base_font(records, aliases, identity, variant=None):
     components = {c for seq in aliases for c in seq}
     targets = {k: glyph_name(sequence(k)) for k in records}
     cmap = {c: targets[aliases[(c,)]] if (c,) in aliases else f'c{c:X}' for c in components}
@@ -145,7 +145,7 @@ def base_font(records, aliases, identity):
     builder.setupMaxp()
     font = builder.font
     font['head'].fontRevision = 0.4
-    set_format_names(font, identity)
+    set_format_names(font, identity, variant=variant)
     font['head'].created = font['head'].modified = 2082844800  # 1970; reproducible builds
     font.recalcTimestamp = False
     rules = []
@@ -158,9 +158,10 @@ def base_font(records, aliases, identity):
     return font, targets
 
 
-def build(records, aliases, output, identity):
+def build(records, aliases, output, identity, variant=None):
     output.mkdir(parents=True, exist_ok=True)
-    font, targets = base_font(records, aliases, identity)
+    font, targets = base_font(records, aliases, identity, variant=variant)
+    label = f'-{variant}' if variant else ''
     sbix = newTable('sbix')
     sbix.version = 1
     sbix.flags = 1
@@ -184,12 +185,12 @@ def build(records, aliases, output, identity):
     paths = []
     for flavor, suffix in [(None, 'ttf'), ('woff2', 'woff2')]:
         font.flavor = flavor
-        path = output / f'Fluent3D-sbix.{suffix}'
+        path = output / f'Fluent3D-sbix{label}.{suffix}'
         save_font(font, path)
         paths.append(path)
     font.flavor = None
     del font['sbix']
-    set_format_names(font, identity, svg=True)
+    set_format_names(font, identity, svg=True, variant=variant)
     svg = newTable('SVG ')
     svg.docList = []
     for k, record in records.items():
@@ -204,7 +205,7 @@ def build(records, aliases, output, identity):
     font['SVG '] = svg
     for flavor, suffix in [(None, 'ttf'), ('woff2', 'woff2')]:
         font.flavor = flavor
-        path = output / f'Fluent3D-svg.{suffix}'
+        path = output / f'Fluent3D-svg{label}.{suffix}'
         save_font(font, path)
         paths.append(path)
     return paths

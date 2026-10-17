@@ -8,6 +8,8 @@ Build colour fonts directly from the latest **Microsoft 3D Fluent catalogue on E
 
 The installed sbix font is named **Fluent 3D Community**; its SVG alternative is named **Fluent 3D Community SVG**. These community names distinguish the fonts from Microsoft products. The repository and Python package use `fluent-3d-emoji-font`.
 
+Every font release also includes a **440×440 companion variant**, built by the separate reusable **Build 440px companion fonts** Action. Files end in `-440.ttf` or `-440.woff2`, with a separate `Fluent3D-fonts-440.tar.gz` bundle. Its font families are **Fluent 3D Community 440** and **Fluent 3D Community 440 SVG**, so both sizes can be installed together. The default files retain the 473×473 crop.
+
 Artwork redistribution rights are currently unverified. A local build can include the entire catalogue with explicit unverified-rights notices. The public workflow audits the actual source images, records hashes and coverage, and publishes fonts only when every image has suitable rights evidence. The project's MIT licence covers code; it does not grant rights to CDN artwork.
 
 [Latest release](https://github.com/soizo/fluent-3d-emoji-font/releases/latest) · [Source-check reports](https://github.com/soizo/fluent-3d-emoji-font/actions) · [Questions and reports](https://github.com/soizo/fluent-3d-emoji-font/issues)
@@ -45,6 +47,15 @@ Build the selected Emojipedia catalogue locally, acknowledging that the artwork 
 ```sh
 fluent-font --allow-unverified-local --output dist/local
 ```
+
+To build the companion from exactly the same original images and Unicode input:
+
+```sh
+fluent-font --allow-unverified-local --crop-size 440 \
+  --source-manifest dist/local/manifest.json --output dist/local-440
+```
+
+This removes 36 pixels from every side of each original 512×512 PNG. A changed source hash stops the companion build. It does not resize the 473px font or substitute a newly discovered catalogue.
 
 The output directory must be empty. Use a different directory for each build. Original images and HTTP validators are cached in `work/emojipedia-assets/`; no Microsoft Git checkout is needed.
 
@@ -136,6 +147,8 @@ After matching rights evidence is supplied for every selected image, the workflo
 Unverified builds include `NOT-FOR-REDISTRIBUTION.txt` and an explicit notice in font name record 13. Scheduled runs do not upload them. For an explicit maintainer-authorised publication, select **Actions → Update fonts → Run workflow → Publish tested fonts with explicit unverified artwork-rights notices**. GitHub Actions then downloads the selected catalogue, crops and builds all four fonts, validates every mapping, runs macOS and Chromium rendering tests, and publishes only after those jobs succeed. It does not upload a developer's existing font files or change the artwork's rights status. The code's MIT licence is not attached to the artwork as a substitute for missing permission. See the [rights evidence process](docs/LICENSING.md).
 
 Completed font builds contain four font files, `manifest.json`, `SHA256SUMS`, `RELEASE.md`, the exact Unicode input and applicable notices. Failed checks do not update a release.
+
+The primary workflow calls `.github/workflows/crop-440.yml` automatically for each publishable or explicitly requested release. Both crops must pass font validation and macOS/Chromium rendering checks before the shared Release is published. The additional files include four `-440` fonts, `manifest-440.json`, `SHA256SUMS-440`, `RELEASE-440.md`, the 440px bundle and rendering previews. The companion manifest links to the primary content identity and records its own embedded-image hashes. `RELEASE-SHA256SUMS.txt` covers both sets of downloadable assets.
 
 ## Contributing
 

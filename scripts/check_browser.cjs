@@ -24,9 +24,9 @@ async function main() {
     browser = await chromium.launch({headless: true});
     const page = await browser.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    const observations = await page.evaluate(async (useLocal) => {
+    const observations = await page.evaluate(async ({useLocal, postscript}) => {
       const face = new FontFace('RenderingRegression', useLocal
-        ? 'local("Fluent3DCommunity04-Regular")' : 'url(/font)');
+        ? `local("${postscript}")` : 'url(/font)');
       document.fonts.add(await face.load());
       const cases = ['😀', '🕵🏽‍♀️', '😍', '🥲', '👩🏻‍💻', '🏳️‍🌈', '1️⃣', '❤️', '🌚', '🫪'];
       const results = [];
@@ -61,7 +61,7 @@ async function main() {
         }
       }
       return results;
-    }, useLocal);
+    }, {useLocal, postscript: process.env.FLUENT_FONT_POSTSCRIPT || 'Fluent3DCommunity04-Regular'});
     for (const result of observations) {
       assert(result.ascent + result.descent > 0, `Empty glyph bounds: ${JSON.stringify(result)}`);
       assert(result.coloured > result.size, `No colour image: ${JSON.stringify(result)}`);

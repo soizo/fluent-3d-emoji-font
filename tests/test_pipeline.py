@@ -191,7 +191,8 @@ def test_unchanged_url_can_have_new_artwork(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('allow_local', [False, True])
-def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path, monkeypatch, allow_local):
+@pytest.mark.parametrize('crop_size', [473, 440])
+def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path, monkeypatch, allow_local, crop_size):
     import fluent_font.cli as cli
     monkeypatch.delenv('GITHUB_OUTPUT', raising=False)
     records = {k: dict(record(tmp_path / f'{k}.png', c, size=512), sequence=k,
@@ -208,7 +209,7 @@ def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path
     monkeypatch.setattr(cli, 'download_catalogue', lambda *args, **kwargs: records)
     out = tmp_path / 'out'
     cli.run(Namespace(output=str(out), cache=str(tmp_path / 'cache'),
-                      approvals='licenses/approvals.json', allow_unverified_local=allow_local))
+                      approvals='licenses/approvals.json', allow_unverified_local=allow_local, crop_size=crop_size))
     manifest = json.loads((out / 'manifest.json').read_text())
     assert manifest['selected_source'] == 'emojipedia'
     assert not manifest['publishable']
@@ -216,21 +217,36 @@ def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path
     if allow_local:
         assert manifest['shaping_checks_passed'] == 8
         assert manifest['artwork_count'] == 2
-        assert all(r['width'] == 473 and r['height'] == 473
+        assert all(r['width'] == crop_size and r['height'] == crop_size
                    for r in manifest['embedded_records'].values())
         assert (out / 'NOT-FOR-REDISTRIBUTION.txt').exists()
         from fontTools.ttLib import TTFont
-        with TTFont(out / 'Fluent3D-sbix.ttf') as font:
+        suffix = '-440' if crop_size == 440 else ''
+        with TTFont(out / f'Fluent3D-sbix{suffix}.ttf') as font:
             licence = font['name'].getDebugName(13)
             assert 'RIGHTS UNVERIFIED' in licence
             assert font['OS/2'].fsType == 2
+            assert font['name'].getDebugName(1) == 'Fluent 3D Community' + (' 440' if suffix else '')
+            assert list(font['sbix'].strikes) == [crop_size]
+        if crop_size == 440:
+            companion = tmp_path / 'companion'
+            cli.run(Namespace(output=str(companion), cache=str(tmp_path / 'cache'),
+                              approvals='licenses/approvals.json', allow_unverified_local=True,
+                              crop_size=440, source_manifest=str(out / 'manifest.json')))
+            assert json.loads((companion / 'manifest.json').read_text())['parent_content_id'] == manifest['content_id']
+            records['1faea']['sha256'] = '0' * 64
+            with pytest.raises(ValueError, match='source differs'):
+                cli.run(Namespace(output=str(tmp_path / 'changed'), cache=str(tmp_path / 'cache'),
+                                  approvals='licenses/approvals.json', allow_unverified_local=True,
+                                  crop_size=440, source_manifest=str(out / 'manifest.json')))
     else:
         assert manifest['build_status'] == 'rights_pending'
         assert manifest['artwork_count'] == 0
         assert not list(out.glob('*.ttf'))
 
 
-def test_centre_crop_preserves_exact_pixels_and_original(tmp_path):
+@pytest.mark.parametrize('size,inset', [(473, 19), (440, 36)])
+def test_centre_crop_preserves_exact_pixels_and_original(tmp_path, size, inset):
     from fluent_font.artwork import centre_crop
     image = Image.new('RGBA', (512, 512))
     image.putdata([(x % 256, y % 256, (x + y) % 256, 255)
@@ -239,9 +255,9 @@ def test_centre_crop_preserves_exact_pixels_and_original(tmp_path):
     image.save(path)
     original = path.read_bytes()
     source = dict(path=str(path), **image_info(original))
-    result = centre_crop({'1faea': source}, tmp_path / 'cropped')['1faea']
+    result = centre_crop({'1faea': source}, tmp_path / 'cropped', size=size)['1faea']
     with Image.open(result['path']) as actual:
-        assert actual.size == (473, 473)
-        assert actual.tobytes() == image.crop((19, 19, 492, 492)).tobytes()
+        assert actual.size == (size, size)
+        assert actual.tobytes() == image.crop((inset, inset, inset + size, inset + size)).tobytes()
     assert path.read_bytes() == original
     assert source['width'] == 512
