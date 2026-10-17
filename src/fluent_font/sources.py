@@ -111,8 +111,8 @@ def candidate_inventory(payload, codes=None):
 
 
 def discover():
-    # The frontend uses version=null for the current full vendor inventory.
-    # Explicit historical release paths may contain legacy filename anomalies.
+    # Discover by dated release metadata, then explicitly select that release.
+    # Filename anomalies are independently resolved through emoji.code below.
     def query(version):
         response = SESSION.post(GRAPHQL, json={'operationName': 'Inventory', 'query': QUERY,
                                 'variables': {'slug': VENDOR, 'version': version}}, timeout=(15, 120))
@@ -122,6 +122,10 @@ def discover():
             raise ValueError(data['errors'])
         return data
     first = query(None)
+    latest = max(first['data']['vendorHistoric_v1'], key=lambda r: r['date'])
+    first = query(latest['slug'])
+    if max(first['data']['vendorHistoric_v1'], key=lambda r: r['date'])['slug'] != latest['slug']:
+        raise ValueError('Vendor release changed during discovery; retry a fresh observation')
     # Verify filename mappings against independent emoji.code, including legacy
     # names with a duplicated skin-tone suffix. No inference from English slugs.
     slugs = sorted({i['slug'] for g in first['data']['vendorHistoricEmoji_v1']['items']

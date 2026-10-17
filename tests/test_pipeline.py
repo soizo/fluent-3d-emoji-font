@@ -100,3 +100,27 @@ def test_linear_strike_matches_fonttools():
                                   originOffsetX=0, originOffsetY=-12)
         strike.compile(Font())
     assert reference.data == linear.data
+
+
+def test_discover_selects_latest_dated_release(monkeypatch):
+    import fluent_font.sources as sources
+    p = payload([item('source/microsoft-3D-fluent/1001/test_1f600.png')])
+    calls = []
+    class Response:
+        def __init__(self, data):
+            self.data = data
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return self.data
+    def post(url, json, timeout):
+        calls.append(json)
+        if json['operationName'] == 'Resolve':
+            return Response({'data': {'e0': {'code': '😀'}}})
+        return Response(p)
+    monkeypatch.setattr(sources.SESSION, 'post', post)
+    monkeypatch.setattr(sources.time, 'sleep', lambda seconds: None)
+    result = sources.discover()
+    assert calls[0]['variables']['version'] is None
+    assert calls[1]['variables']['version'] == 'new'
+    assert result['asset_set_ids'] == ['1001']

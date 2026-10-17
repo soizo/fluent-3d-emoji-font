@@ -65,7 +65,7 @@ fluent-font --upstream work/upstream --output dist
 
 ## 发现、映射与质量
 
-Emojipedia 的公开目录 GraphQL 接口先返回版本和日期，并获取当前完整图案列表；
+Emojipedia 的公开目录 GraphQL 接口先返回版本和日期，再按最新条目的 slug 获取完整图案列表；
 不猜 CDN 编号，不按英文名称生成 URL，不把 `473` 写死在程序中。接口不是稳定承诺，结构变化就报错。
 详见 [调查记录](docs/UPSTREAM.md)。
 
