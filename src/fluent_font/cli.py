@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import shutil
 
-from .sources import (canonical, digest, get, discover, download_catalogue, emoji_data, key)
+from .sources import (canonical, digest, get, discover, download_catalogue, emoji_data, key, image_info)
 from .font import mappings, build, validate
 from .artwork import centre_crop
 
@@ -46,6 +46,24 @@ def checksums(out):
     (out / 'SHA256SUMS').write_text('\n'.join(sums) + '\n')
 
 
+def snapshot_artwork(snapshot, cache):
+    """Read pinned original PNGs offline, without catalogue or image requests."""
+    candidates = snapshot['candidate_inventory']['records']
+    if set(candidates) != set(snapshot['source_records']):
+        raise ValueError('Companion build source differs from the primary release snapshot')
+    records = {}
+    for seq, candidate in candidates.items():
+        expected = snapshot['source_records'][seq]
+        path = cache / (expected['sha256'] + '.png')
+        if not path.is_file():
+            raise ValueError(f'Missing pinned original PNG; no network fallback: {seq}')
+        info = image_info(path.read_bytes())
+        if candidate['url'] != expected['url'] or any(info[k] != expected[k] for k in info):
+            raise ValueError(f'Companion build source differs from the primary release snapshot: {seq}')
+        records[seq] = dict(candidate, **info, path=str(path))
+    return records
+
+
 def run(args):
     out = Path(args.output)
     if out.exists() and any(out.iterdir()):
@@ -63,7 +81,8 @@ def run(args):
     approvals = json.loads(Path(args.approvals).read_text())
     approved = validate_approvals(candidates['records'], approvals)
     pending = sorted(set(candidates['records']) - set(approved))
-    records = download_catalogue(candidates, cache, audit_only=bool(pending and not args.allow_unverified_local))
+    records = (snapshot_artwork(snapshot, cache) if snapshot else
+               download_catalogue(candidates, cache, audit_only=bool(pending and not args.allow_unverified_local)))
     if snapshot:
         actual = {k: (r['url'], r['sha256']) for k, r in records.items()}
         expected = {k: (r['url'], r['sha256']) for k, r in snapshot['source_records'].items()}

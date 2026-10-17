@@ -55,7 +55,7 @@ fluent-font --allow-unverified-local --crop-size 440 \
   --source-manifest dist/local/manifest.json --output dist/local-440
 ```
 
-This removes 36 pixels from every side of each original 512×512 PNG. A changed source hash stops the companion build. It does not resize the 473px font or substitute a newly discovered catalogue.
+This removes 36 pixels from every side of each original 512×512 PNG. The companion reads the primary build's cached originals offline; it makes no catalogue, Unicode or image requests. A changed or missing source stops the build without a network fallback. It does not resize the 473px font or substitute a newly discovered catalogue.
 
 The output directory must be empty. Use a different directory for each build. Original images and HTTP validators are cached in `work/emojipedia-assets/`; no Microsoft Git checkout is needed.
 
@@ -130,7 +130,9 @@ Image filenames are cross-checked against the independent `emoji.code` field. Th
 
 Every source is recorded with its exact URL, native dimensions, PNG hash and decoded-pixel hash. Conditional HTTP requests use ETag or Last-Modified values to detect revisions at unchanged URLs. Cache entries are validated before reuse. A changed image creates a new content identity; a changed check date alone does not.
 
-GitHub Actions checks daily at 02:17 UTC and supports **Actions → Update fonts → Run workflow**. Scheduled runs may be delayed or suspended by GitHub on inactive repositories. Public CI caches only the metadata index, never unverified artwork or fonts. See the [source investigation](docs/UPSTREAM.md).
+Updates are primarily manual through **Actions → Update fonts → Run workflow**. Manual runs default to the saved original-source snapshot in the maintainer-only draft release selected by `source_cache_release`. They verify its archive checksum and every original PNG, then build without contacting Emojipedia or Unicode. Missing or corrupt cached inputs fail the build; there is no silent upstream fallback. Select **Contact Emojipedia for fresh artwork** only when you want to refresh the source.
+
+The scheduled source check runs once a month, on the first day at **02:17 UTC (10:17 China Standard Time)**. Pushes and pull requests run fixture-based tests only; they do not discover or download upstream artwork. Scheduled runs may be delayed or suspended by GitHub on inactive repositories. Routine source audits cache only the metadata index. For a font publication, original PNGs are shared with the companion job in a one-day GitHub artifact, so the 440px variant does not fetch them again from Emojipedia. The saved source-cache draft remains unpublished and retains its unverified-rights notice. See the [source investigation](docs/UPSTREAM.md).
 
 ## Coverage and quality
 

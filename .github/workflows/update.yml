@@ -1,9 +1,17 @@
 name: Update fonts
 on:
   schedule:
-    - cron: '17 2 * * *'
+    - cron: '17 2 1 * *'
   workflow_dispatch:
     inputs:
+      refresh_upstream:
+        description: 'Contact Emojipedia for fresh artwork (otherwise reuse the saved source cache)'
+        type: boolean
+        default: false
+      source_cache_release:
+        description: 'Draft release containing the saved original source snapshot'
+        type: string
+        default: build-source-cache-2026-10-17
       publish_unverified_artwork:
         description: 'Publish tested fonts with explicit unverified artwork-rights notices'
         type: boolean
@@ -29,10 +37,12 @@ jobs:
       - run: python -m pip install -e '.[test]'
       - run: python -m pytest -q
   build:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     needs: test
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: write # Read the maintainer-only draft source-cache release.
     outputs:
       tag: ${{ steps.build.outputs.tag }}
       publishable: ${{ steps.build.outputs.publishable }}
@@ -46,6 +56,7 @@ jobs:
       - run: python -m pip install -e '.[test]'
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         id: artwork-cache
+        if: github.event_name == 'schedule' || inputs.refresh_upstream
         with:
           path: work/emojipedia-assets/images.json
           key: emojipedia-${{ runner.os }}-${{ github.run_id }}
@@ -54,11 +65,27 @@ jobs:
         id: build
         env:
           MANUAL_PUBLICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_unverified_artwork }}
+          REFRESH_UPSTREAM: ${{ github.event_name == 'schedule' || inputs.refresh_upstream }}
+          SOURCE_CACHE_RELEASE: ${{ inputs.source_cache_release }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
         run: |
+          options=()
           if [ "$MANUAL_PUBLICATION" = true ]; then
-            fluent-font --allow-unverified-local --output dist
-          else
-            fluent-font --output dist
+            options+=(--allow-unverified-local)
+          fi
+          if [ "$REFRESH_UPSTREAM" != true ]; then
+            mkdir -p work/saved-source
+            gh release download "$SOURCE_CACHE_RELEASE" --pattern SourceSnapshot.tar.gz --pattern SourceSnapshot.sha256 --dir work/saved-source
+            (cd work/saved-source && sha256sum -c SourceSnapshot.sha256)
+            tar -xzf work/saved-source/SourceSnapshot.tar.gz -C work/saved-source
+            options+=(--source-manifest work/saved-source/snapshot/manifest.json
+                      --cache work/saved-source/originals)
+          fi
+          fluent-font --output dist "${options[@]}"
+          if [ "$REFRESH_UPSTREAM" != true ]; then
+            cp work/saved-source/originals/*.png work/emojipedia-assets/
           fi
       - name: Determine publication readiness without changing rights status
         id: publication
@@ -76,7 +103,7 @@ jobs:
           fi
           echo "ready=$ready" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        if: steps.artwork-cache.outputs.cache-matched-key != format('emojipedia-{0}-{1}', runner.os, steps.build.outputs.cache_key)
+        if: (github.event_name == 'schedule' || inputs.refresh_upstream) && steps.artwork-cache.outputs.cache-matched-key != format('emojipedia-{0}-{1}', runner.os, steps.build.outputs.cache_key)
         with:
           path: work/emojipedia-assets/images.json
           key: emojipedia-${{ runner.os }}-${{ steps.build.outputs.cache_key }}
@@ -96,6 +123,14 @@ jobs:
             dist/emoji-test.txt
           if-no-files-found: error
           retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.publication.outputs.ready == 'true'
+        with:
+          name: original-artwork
+          path: work/emojipedia-assets/*.png
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: source-report-or-verified-fonts

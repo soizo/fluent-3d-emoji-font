@@ -229,12 +229,21 @@ def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path
             assert font['name'].getDebugName(1) == 'Fluent 3D Community' + (' 440' if suffix else '')
             assert list(font['sbix'].strikes) == [crop_size]
         if crop_size == 440:
+            import shutil
+            for source in records.values():
+                shutil.copyfile(source['path'], tmp_path / 'cache' / (source['sha256'] + '.png'))
+            def unexpected_network(*args, **kwargs):
+                raise AssertionError('Companion build must remain offline')
+            monkeypatch.setattr(cli, 'download_catalogue', unexpected_network)
+            monkeypatch.setattr(cli, 'discover', unexpected_network)
+            monkeypatch.setattr(cli, 'get', unexpected_network)
             companion = tmp_path / 'companion'
             cli.run(Namespace(output=str(companion), cache=str(tmp_path / 'cache'),
                               approvals='licenses/approvals.json', allow_unverified_local=True,
                               crop_size=440, source_manifest=str(out / 'manifest.json')))
             assert json.loads((companion / 'manifest.json').read_text())['parent_content_id'] == manifest['content_id']
-            records['1faea']['sha256'] = '0' * 64
+            Path(tmp_path / 'cache' / (records['1faea']['sha256'] + '.png')).write_bytes(
+                Path(records['1f31a']['path']).read_bytes())
             with pytest.raises(ValueError, match='source differs'):
                 cli.run(Namespace(output=str(tmp_path / 'changed'), cache=str(tmp_path / 'cache'),
                                   approvals='licenses/approvals.json', allow_unverified_local=True,
