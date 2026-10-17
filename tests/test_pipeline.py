@@ -12,8 +12,8 @@ from fluent_font.font import mappings, build, validate
 from fluent_font.cli import validate_approvals
 
 
-def record(path, color):
-    im = Image.new('RGBA', (64, 64), color)
+def record(path, color, size=64):
+    im = Image.new('RGBA', (size, size), color)
     im.save(path)
     return dict(path=str(path), **image_info(path.read_bytes()))
 
@@ -37,7 +37,7 @@ def test_roundtrip_complex_sequences_and_lossless_images(tmp_path):
             assert glyph.xMax > glyph.xMin and glyph.yMax > glyph.yMin
     with TTFont(paths[2]) as svg:
         assert svg['name'].getDebugName(1) == 'Fluent 3D Community SVG'
-        assert svg['name'].getDebugName(6) == 'Fluent3DCommunity03SVG-Regular'
+        assert svg['name'].getDebugName(6) == 'Fluent3DCommunity04SVG-Regular'
     first = [p.read_bytes() for p in paths]
     assert [p.read_bytes() for p in build(records, aliases, tmp_path / 'fonts2', 'test')] == first
 
@@ -194,7 +194,7 @@ def test_unchanged_url_can_have_new_artwork(tmp_path, monkeypatch):
 def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path, monkeypatch, allow_local):
     import fluent_font.cli as cli
     monkeypatch.delenv('GITHUB_OUTPUT', raising=False)
-    records = {k: dict(record(tmp_path / f'{k}.png', c), sequence=k,
+    records = {k: dict(record(tmp_path / f'{k}.png', c, size=512), sequence=k,
                        source='emojipedia', rights='unverified',
                        url=f'https://example.invalid/{k}.png')
                for k, c in [('1f31a', 'purple'), ('1faea', 'orange')]}
@@ -216,6 +216,8 @@ def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path
     if allow_local:
         assert manifest['shaping_checks_passed'] == 8
         assert manifest['artwork_count'] == 2
+        assert all(r['width'] == 473 and r['height'] == 473
+                   for r in manifest['embedded_records'].values())
         assert (out / 'NOT-FOR-REDISTRIBUTION.txt').exists()
         from fontTools.ttLib import TTFont
         with TTFont(out / 'Fluent3D-sbix.ttf') as font:
@@ -226,3 +228,20 @@ def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path
         assert manifest['build_status'] == 'rights_pending'
         assert manifest['artwork_count'] == 0
         assert not list(out.glob('*.ttf'))
+
+
+def test_centre_crop_preserves_exact_pixels_and_original(tmp_path):
+    from fluent_font.artwork import centre_crop
+    image = Image.new('RGBA', (512, 512))
+    image.putdata([(x % 256, y % 256, (x + y) % 256, 255)
+                   for y in range(512) for x in range(512)])
+    path = tmp_path / 'source.png'
+    image.save(path)
+    original = path.read_bytes()
+    source = dict(path=str(path), **image_info(original))
+    result = centre_crop({'1faea': source}, tmp_path / 'cropped')['1faea']
+    with Image.open(result['path']) as actual:
+        assert actual.size == (473, 473)
+        assert actual.tobytes() == image.crop((19, 19, 492, 492)).tobytes()
+    assert path.read_bytes() == original
+    assert source['width'] == 512

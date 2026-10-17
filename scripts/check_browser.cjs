@@ -26,7 +26,7 @@ async function main() {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     const observations = await page.evaluate(async (useLocal) => {
       const face = new FontFace('RenderingRegression', useLocal
-        ? 'local("Fluent3DCommunity03-Regular")' : 'url(/font)');
+        ? 'local("Fluent3DCommunity04-Regular")' : 'url(/font)');
       document.fonts.add(await face.load());
       const cases = ['😀', '🕵🏽‍♀️', '😍', '🥲', '👩🏻‍💻', '🏳️‍🌈', '1️⃣', '❤️', '🌚', '🫪'];
       const results = [];

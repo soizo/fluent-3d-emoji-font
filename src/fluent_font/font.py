@@ -83,7 +83,7 @@ def bounds_glyph(bounds):
 def set_format_names(font, identity, svg=False):
     family = 'Fluent 3D Community' + (' SVG' if svg else '')
     # Distinguish the new source generation from previously cached Git artwork.
-    ps_name = 'Fluent3DCommunity03' + ('SVG' if svg else '') + '-Regular'
+    ps_name = 'Fluent3DCommunity04' + ('SVG' if svg else '') + '-Regular'
     names = {1: family, 3: identity + (';svg' if svg else ';sbix'),
              4: family + ' Regular', 6: ps_name}
     for record in font['name'].names:
@@ -134,7 +134,7 @@ def base_font(records, aliases, identity):
     builder.setupNameTable({'familyName': 'Fluent 3D Community', 'styleName': 'Regular',
                             'uniqueFontIdentifier': identity,
                             'fullName': 'Fluent 3D Community Regular',
-                            'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.300',
+                            'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.400',
                             'copyright': 'Artwork: Microsoft Corporation; see bundled source and license notices.',
                             'licenseDescription': artwork_licence(records)})
     builder.setupOS2(sTypoAscender=848, sTypoDescender=-208, usWinAscent=848,
@@ -144,7 +144,7 @@ def base_font(records, aliases, identity):
     builder.setupPost()
     builder.setupMaxp()
     font = builder.font
-    font['head'].fontRevision = 0.3
+    font['head'].fontRevision = 0.4
     set_format_names(font, identity)
     font['head'].created = font['head'].modified = 2082844800  # 1970; reproducible builds
     font.recalcTimestamp = False

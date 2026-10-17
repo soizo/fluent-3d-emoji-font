@@ -70,7 +70,7 @@ fonttools subset dist/local/Fluent3D-sbix.ttf \
   --output-file=dist/local/Fluent3D-custom.woff2 --flavor=woff2 --retain-gids
 ```
 
-Use the actual text your page needs. Subsetting removes unused glyphs, preserving the selected PNGs at their original resolution. Full-resolution fonts can exceed Chromium's 128 MB web-font decoding limit; install the full TTF for desktop use and use a suitable subset for web embedding. The source renderer's [limit is documented in Chromium](https://chromium.googlesource.com/chromium/src/+/c30907edb428e4185390d4c606510c65da38ab06/third_party/blink/renderer/platform/fonts/web_font_decoder.cc).
+Use the actual text your page needs. Subsetting removes unused glyphs, preserving the selected 473×473 PNGs without further changes. Full-catalogue fonts can exceed Chromium's 128 MB web-font decoding limit; install the full TTF for desktop use and use a suitable subset for web embedding. The source renderer's [limit is documented in Chromium](https://chromium.googlesource.com/chromium/src/+/c30907edb428e4185390d4c606510c65da38ab06/third_party/blink/renderer/platform/fonts/web_font_decoder.cc).
 
 ```css
 @font-face {
@@ -107,7 +107,7 @@ CBDT/CBLC is not currently generated. FontGoggles renders outlines and COLR font
 
 Version 0.1 had empty glyph bounds, which caused some renderers to reserve width but paint nothing. Non-painting bounds contours and corrected sbix origins fix that issue. Native CoreText checks and Chromium pixel checks now verify visible colour at multiple sizes, including new moon face (`🌚`, U+1F31A) and distorted face (`🫪`, U+1FAEA).
 
-PNG bytes are embedded without scaling or re-encoding. Rendering above their native resolution remains subject to bitmap limitations. A source with a new resolution requires an explicit strike design rather than silent resampling or missing glyphs.
+From version 0.4, every 512×512 source is centre-cropped to 473×473 without scaling or resampling. The crop removes 19 pixels from the left and top and 20 from the right and bottom (the difference is odd). Retained RGBA pixels are unchanged; PNGs are re-encoded losslessly. A different source size fails the build for explicit review.
 
 ## Source discovery and updates
 
@@ -123,7 +123,7 @@ GitHub Actions checks daily at 02:17 UTC and supports **Actions → Update fonts
 
 The latest Unicode `emoji-test.txt` provides the coverage denominator. Non-RGI catalogue sequences are retained and reported separately. Qualification aliases are limited to forms listed by Unicode; no unsupported artwork is invented.
 
-Each output is reopened and every mapping is shaped with HarfBuzz. Embedded PNGs are compared byte-for-byte with their downloaded sources. Glyph bounds must be non-empty and match bitmap placement. The required regression characters include `🌚` and `🫪`; system fallback is not counted as font coverage.
+Each output is reopened and every mapping is shaped with HarfBuzz. Embedded PNGs are compared byte-for-byte with the cropped assets. The manifest records the crop box and separate original-source and embedded-image hashes. Glyph bounds must be non-empty and match bitmap placement. The required regression characters include `🌚` and `🫪`; system fallback is not counted as font coverage.
 
 Build manifests distinguish catalogue size, downloaded artwork, actual font coverage and pending redistribution evidence. A successful source audit does not mean a font was built or released. Coverage alone is not a claim that older artwork matches a newer reference.
 

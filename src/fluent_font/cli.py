@@ -7,6 +7,7 @@ import shutil
 
 from .sources import (canonical, digest, get, discover, download_catalogue, emoji_data, key)
 from .font import mappings, build, validate
+from .artwork import centre_crop
 
 
 def write_json(path, value):
@@ -95,6 +96,8 @@ def run(args):
         print(json.dumps({k: report[k] for k in ['build_status', 'reference_count', 'publishable']}))
         return
     publishable = not pending
+    records = centre_crop(records, cache / 'cropped-473')
+    cropped_records = {k: {a: b for a, b in v.items() if a != 'path'} for k, v in records.items()}
     aliases = mappings(records, unicode_entries)
     required = {s for s, status in unicode_entries.items() if status == 'fully-qualified'}
     missing = sorted(required - aliases.keys())
@@ -103,15 +106,15 @@ def run(args):
     implementation = {p.name: digest(p.read_bytes()) for p in sorted(Path(__file__).parent.glob('*.py'))}
     identity_records = {k: {a: b for a, b in v.items() if a not in
                             {'url', 'upstream_commit', 'slug', 'asset_set_id', 'status', 'source'}}
-                        for k, v in public_records.items()}
+                        for k, v in cropped_records.items()}
     identity_data = dict(records=identity_records, unicode_sha256=digest(unicode_raw),
                          implementation=implementation, config=digest(Path('pyproject.toml').read_bytes()),
                          approvals=approvals, licenses={p.name: digest(p.read_bytes())
                          for p in sorted(Path('licenses').glob('*')) if p.is_file()})
     identity = digest(canonical(identity_data))
-    tag = 'v0.3-' + identity[:20]
+    tag = 'v0.4-' + identity[:20]
     checked = datetime.now(timezone.utc).isoformat()
-    report = dict(schema_version=2, font_version='0.3.0', content_id=identity, tag=tag, checked_at=checked,
+    report = dict(schema_version=2, font_version='0.4.0', content_id=identity, tag=tag, checked_at=checked,
                   selected_source='emojipedia', publishable=publishable,
                   build_status='verified' if publishable else 'local_unverified',
                   unicode_version=unicode_version, unicode_sha256=digest(unicode_raw),
@@ -122,7 +125,10 @@ def run(args):
                   rgi_coverage=(len(required)-len(missing))/len(required),
                   missing_rgi=[key(s) for s in missing],
                   pending_rights_sequences=pending, unverified_reference_count=len(pending),
-                  selected_catalogue_png_bytes_preserved=True,
+                  selected_catalogue_png_bytes_preserved=False,
+                  image_transform=dict(operation='centre_crop', source_size=[512, 512],
+                                       box=[19, 19, 492, 492], output_size=[473, 473], resampled=False),
+                  embedded_records=cropped_records,
                   qualification_alias_count=len(aliases)-len(records),
                   extra_non_rgi_sequences=sorted(set(records)-{key(s) for s in unicode_entries}),
                   source_records=public_records, candidate_inventory=candidates,
@@ -152,12 +158,13 @@ def run(args):
              f'Latest Emojipedia reference: {candidates["release"]["title"]}, '
              f'asset set IDs {candidates["asset_set_ids"]}, {len(candidate_keys)} records.\n\n'
              f'All {len(candidate_keys)} selected catalogue images are included, with '
-             'embedded PNG bytes checked against the downloaded source.\n\n'
+             'centre-cropped from 512×512 to 473×473 without resampling. '
+             'Embedded PNG bytes are checked against the cropped assets; original source hashes are retained.\n\n'
              f'Redistribution status: {"verified" if publishable else "UNVERIFIED — LOCAL BUILD ONLY"}. '
              f'{len(pending)} images lack confirmed redistribution evidence.\n\n'
              'Install the sbix TTF on macOS. SVG is an application-dependent alternative; '
              'WOFF2 is a web container, not a guarantee of color support. See README.\n\n'
-             f'Validated {report["shaping_checks_passed"]} shaping cases; original PNG bytes preserved. '
+             f'Validated {report["shaping_checks_passed"]} shaping cases; cropped pixels preserved. '
              'See manifest.json for hashes, mappings and all missing sequences.\n')
     (out / 'RELEASE.md').write_text(notes)
     if not publishable:
