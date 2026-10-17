@@ -1,4 +1,6 @@
-# 上游调查记录（2026-10-17）
+# Source investigation (2026-10-17)
+
+Version 0.3 uses the selected Emojipedia catalogue as the sole artwork source. The Microsoft repository section below is a historical comparison, not an active fallback. The new moon face comparison exposed a real artwork difference: the repository has a 256×256 closed-eye image; the selected Emojipedia image is 512×512 with half-open eyes. The distorted face (`U+1FAEA`, `🫪`) and new moon face (`U+1F31A`, `🌚`) are required mapping, byte-preservation and pixel-rendering regression cases.
 
 ## Emojipedia
 

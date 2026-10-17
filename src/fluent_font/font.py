@@ -82,12 +82,26 @@ def bounds_glyph(bounds):
 
 def set_format_names(font, identity, svg=False):
     family = 'Fluent 3D Community' + (' SVG' if svg else '')
-    ps_name = 'Fluent3DCommunity' + ('SVG' if svg else '') + '-Regular'
+    # Distinguish the new source generation from previously cached Git artwork.
+    ps_name = 'Fluent3DCommunity03' + ('SVG' if svg else '') + '-Regular'
     names = {1: family, 3: identity + (';svg' if svg else ';sbix'),
              4: family + ' Regular', 6: ps_name}
     for record in font['name'].names:
         if record.nameID in names:
             record.string = names[record.nameID].encode(record.getEncoding())
+
+
+def artwork_licence(records):
+    evidence = sorted({r['license_evidence']['license_file'] for r in records.values()
+                       if r.get('license_evidence')})
+    notice = ('Artwork copyright belongs to Microsoft Corporation and the respective rights holders.\n'
+              'Source: Emojipedia Microsoft 3D Fluent.\n'
+              'The project code MIT licence does not license this artwork.\n')
+    if any(r.get('rights', 'unverified') == 'unverified' for r in records.values()):
+        notice += 'REDISTRIBUTION AND FONT-EMBEDDING RIGHTS UNVERIFIED. LOCAL BUILD ONLY.\n'
+    for path in evidence:
+        notice += '\n' + Path(path).read_text()
+    return notice + '\nProject code only:\n' + Path('LICENSE').read_text()
 
 
 def mappings(records, unicode_entries):
@@ -120,16 +134,17 @@ def base_font(records, aliases, identity):
     builder.setupNameTable({'familyName': 'Fluent 3D Community', 'styleName': 'Regular',
                             'uniqueFontIdentifier': identity,
                             'fullName': 'Fluent 3D Community Regular',
-                            'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.200',
+                            'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.300',
                             'copyright': 'Artwork: Microsoft Corporation; see bundled source and license notices.',
-                            'licenseDescription': '\n\n'.join(p.read_text() for p in sorted(Path('licenses').iterdir())
-                                if p.is_file() and p.suffix != '.json')})
+                            'licenseDescription': artwork_licence(records)})
     builder.setupOS2(sTypoAscender=848, sTypoDescender=-208, usWinAscent=848,
-                    usWinDescent=208, fsType=0)
+                    usWinDescent=208,
+                    fsType=2 if any(r.get('rights', 'unverified') == 'unverified'
+                                   for r in records.values()) else 0)
     builder.setupPost()
     builder.setupMaxp()
     font = builder.font
-    font['head'].fontRevision = 0.2
+    font['head'].fontRevision = 0.3
     set_format_names(font, identity)
     font['head'].created = font['head'].modified = 2082844800  # 1970; reproducible builds
     font.recalcTimestamp = False

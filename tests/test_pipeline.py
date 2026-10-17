@@ -1,13 +1,15 @@
 import io
 import json
+from argparse import Namespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
 
 from fluent_font.sources import candidate_inventory, emoji_data, image_info, key
 from fluent_font.font import mappings, build, validate
-from fluent_font.cli import approved_candidates
+from fluent_font.cli import validate_approvals
 
 
 def record(path, color):
@@ -17,7 +19,7 @@ def record(path, color):
 
 
 def test_roundtrip_complex_sequences_and_lossless_images(tmp_path):
-    sequences = ['1f600', '1f469-1f3fb-200d-1f4bb', '1f1e8-1f1f3',
+    sequences = ['1f600', '1faea', '1f31a', '1f469-1f3fb-200d-1f4bb', '1f1e8-1f1f3',
                  '0031-fe0f-20e3', '2764-fe0f', '1f3f4-e0067-e0062-e0065-e006e-e0067-e007f']
     records = {k: record(tmp_path / f'{i}.png', (i*30, 100, 180, 255)) for i, k in enumerate(sequences)}
     entries = {tuple(int(c,16) for c in k.split('-')): 'fully-qualified' for k in sequences}
@@ -35,7 +37,7 @@ def test_roundtrip_complex_sequences_and_lossless_images(tmp_path):
             assert glyph.xMax > glyph.xMin and glyph.yMax > glyph.yMin
     with TTFont(paths[2]) as svg:
         assert svg['name'].getDebugName(1) == 'Fluent 3D Community SVG'
-        assert svg['name'].getDebugName(6) == 'Fluent3DCommunitySVG-Regular'
+        assert svg['name'].getDebugName(6) == 'Fluent3DCommunity03SVG-Regular'
     first = [p.read_bytes() for p in paths]
     assert [p.read_bytes() for p in build(records, aliases, tmp_path / 'fonts2', 'test')] == first
 
@@ -70,9 +72,9 @@ def test_version_discovery_and_conflict():
 
 
 def test_rights_gate_does_not_download_unapproved(tmp_path):
-    assert approved_candidates({'1faea': {'url': 'https://invalid.example/'}}, [], tmp_path) == {}
+    assert validate_approvals({'1faea': {'url': 'https://invalid.example/'}}, []) == {}
     with pytest.raises(ValueError, match='no longer matches'):
-        approved_candidates({}, [{'sequence': '1faea', 'url': 'https://invalid.example/'}], tmp_path)
+        validate_approvals({}, [{'sequence': '1faea', 'url': 'https://invalid.example/'}])
 
 
 def test_mixed_resolutions_rejected(tmp_path):
@@ -149,3 +151,78 @@ def test_discover_selects_latest_dated_release(monkeypatch):
     assert calls[0]['variables']['version'] is None
     assert calls[1]['variables']['version'] == 'new'
     assert result['asset_set_ids'] == ['1001']
+
+
+def test_image_audit_revalidates_without_publishing_png_cache(tmp_path, monkeypatch):
+    import fluent_font.sources as sources
+    raw = tmp_path / 'fixture.png'
+    Image.new('RGBA', (64, 64), 'purple').save(raw)
+    catalogue = {'records': {'1faea': {'url': 'https://example.invalid/distorted.png',
+                                     'source': 'emojipedia', 'rights': 'unverified'}}}
+    calls = []
+    def get(url, headers):
+        calls.append(headers)
+        return SimpleNamespace(status_code=304 if headers else 200,
+                               content=b'' if headers else raw.read_bytes(),
+                               headers={'ETag': '"fixture-v1"'})
+    monkeypatch.setattr(sources, 'get', get)
+    cache = tmp_path / 'cache'
+    first = sources.download_catalogue(catalogue, cache, workers=1, audit_only=True)
+    assert not list(cache.glob('*.png'))
+    second = sources.download_catalogue(catalogue, cache, workers=1, audit_only=True)
+    assert second['1faea']['sha256'] == first['1faea']['sha256']
+    assert calls == [{}, {'If-None-Match': '"fixture-v1"'}]
+
+
+def test_unchanged_url_can_have_new_artwork(tmp_path, monkeypatch):
+    import fluent_font.sources as sources
+    a = tmp_path / 'a.png'; b = tmp_path / 'b.png'
+    Image.new('RGBA', (64, 64), 'red').save(a)
+    Image.new('RGBA', (64, 64), 'blue').save(b)
+    catalogue = {'records': {'1f31a': {'url': 'https://example.invalid/moon.png',
+                                     'source': 'emojipedia', 'rights': 'unverified'}}}
+    responses = iter([a.read_bytes(), b.read_bytes()])
+    monkeypatch.setattr(sources, 'get', lambda *args, **kwargs:
+                        SimpleNamespace(status_code=200, content=next(responses), headers={}))
+    first = sources.download_catalogue(catalogue, tmp_path / 'cache', workers=1)
+    second = sources.download_catalogue(catalogue, tmp_path / 'cache', workers=1)
+    assert first['1f31a']['sha256'] != second['1f31a']['sha256']
+    assert first['1f31a']['url'] == second['1f31a']['url']
+
+
+@pytest.mark.parametrize('allow_local', [False, True])
+def test_emojipedia_is_the_only_font_source_and_rights_gate_is_separate(tmp_path, monkeypatch, allow_local):
+    import fluent_font.cli as cli
+    monkeypatch.delenv('GITHUB_OUTPUT', raising=False)
+    records = {k: dict(record(tmp_path / f'{k}.png', c), sequence=k,
+                       source='emojipedia', rights='unverified',
+                       url=f'https://example.invalid/{k}.png')
+               for k, c in [('1f31a', 'purple'), ('1faea', 'orange')]}
+    candidates = {'release': {'title': 'New release', 'slug': 'new', 'date': 1},
+                  'asset_set_ids': ['999'],
+                  'records': {k: {a: b for a, b in r.items() if a in ['sequence', 'url', 'source', 'rights']}
+                              for k, r in records.items()}}
+    monkeypatch.setattr(cli, 'discover', lambda: candidates)
+    monkeypatch.setattr(cli, 'get', lambda url: SimpleNamespace(content=(
+        '# Version: 18.0\n1F31A ; fully-qualified # moon\n1FAEA ; fully-qualified # distorted\n').encode()))
+    monkeypatch.setattr(cli, 'download_catalogue', lambda *args, **kwargs: records)
+    out = tmp_path / 'out'
+    cli.run(Namespace(output=str(out), cache=str(tmp_path / 'cache'),
+                      approvals='licenses/approvals.json', allow_unverified_local=allow_local))
+    manifest = json.loads((out / 'manifest.json').read_text())
+    assert manifest['selected_source'] == 'emojipedia'
+    assert not manifest['publishable']
+    assert all(r['source'] == 'emojipedia' for r in manifest['source_records'].values())
+    if allow_local:
+        assert manifest['shaping_checks_passed'] == 8
+        assert manifest['artwork_count'] == 2
+        assert (out / 'NOT-FOR-REDISTRIBUTION.txt').exists()
+        from fontTools.ttLib import TTFont
+        with TTFont(out / 'Fluent3D-sbix.ttf') as font:
+            licence = font['name'].getDebugName(13)
+            assert 'RIGHTS UNVERIFIED' in licence
+            assert font['OS/2'].fsType == 2
+    else:
+        assert manifest['build_status'] == 'rights_pending'
+        assert manifest['artwork_count'] == 0
+        assert not list(out.glob('*.ttf'))

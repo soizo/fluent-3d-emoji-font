@@ -1,70 +1,81 @@
 # Fluent 3D Emoji Font _(fluent-3d-emoji-font)_
 
-[![Automatic updates](https://github.com/soizo/fluent-3d-emoji-font/actions/workflows/update.yml/badge.svg)](https://github.com/soizo/fluent-3d-emoji-font/actions/workflows/update.yml)
+[![Source checks](https://github.com/soizo/fluent-3d-emoji-font/actions/workflows/update.yml/badge.svg)](https://github.com/soizo/fluent-3d-emoji-font/actions/workflows/update.yml)
 
 Auditable Fluent 3D emoji font builds with provenance and licensing gates.
 
-This repository automatically builds colour fonts from Microsoft's official PNG artwork while using Emojipedia to discover the latest candidate artwork. The installed font is named **Fluent 3D Community** to distinguish this community project from Microsoft products; the repository and Python package use the `fluent-3d-emoji-font` name.
+Build colour fonts directly from the latest **Microsoft 3D Fluent catalogue on Emojipedia**. From version 0.3 onwards, every image comes from that selected catalogue. The project does not substitute older artwork from Microsoft's open-source repository or use third-party precompiled fonts.
 
-The public fonts contain only artwork with verified redistribution rights. They do not claim complete visual parity with the latest Microsoft release. When redistribution rights for new artwork listed by Emojipedia cannot be confirmed, the build records the catalogue entry and coverage gap but excludes the image from the public font. The project does not depend on third-party precompiled fonts.
+The installed sbix font is named **Fluent 3D Community**; its SVG alternative is named **Fluent 3D Community SVG**. These community names distinguish the fonts from Microsoft products. The repository and Python package use `fluent-3d-emoji-font`.
 
-[Download the latest fonts](https://github.com/soizo/fluent-3d-emoji-font/releases/latest) · [View releases and coverage](https://github.com/soizo/fluent-3d-emoji-font/releases) · [View build status](https://github.com/soizo/fluent-3d-emoji-font/actions)
+Artwork redistribution rights are currently unverified. A local build can include the entire catalogue with explicit unverified-rights notices. The public workflow audits the actual source images, records hashes and coverage, and publishes fonts only when every image has suitable rights evidence. The project's MIT licence covers code; it does not grant rights to CDN artwork.
+
+[Source-check reports](https://github.com/soizo/fluent-3d-emoji-font/actions) · [Historical releases](https://github.com/soizo/fluent-3d-emoji-font/releases) · [Questions and reports](https://github.com/soizo/fluent-3d-emoji-font/issues)
+
+Historical 0.1 and 0.2 releases used Microsoft's older open-source artwork. They do **not** represent the current Emojipedia-source pipeline. In particular, the older new moon face has closed eyes; the current reference has half-open eyes.
 
 ## Table of contents
 
-- [Background](#background)
 - [Install](#install)
 - [Usage](#usage)
-- [Formats and compatibility](#formats-and-compatibility)
-- [Local build](#local-build)
-- [Discovery, mapping and quality](#discovery-mapping-and-quality)
-- [Release contents](#release-contents)
+- [Formats and rendering](#formats-and-rendering)
+- [Source discovery and updates](#source-discovery-and-updates)
+- [Coverage and quality](#coverage-and-quality)
+- [Automatic publication](#automatic-publication)
 - [Contributing](#contributing)
 - [Licence](#licence)
 
-## Background
-
-The project checks for upstream changes every day at 02:17 UTC. GitHub may delay scheduled workflows and may suspend them on public repositories with prolonged inactivity. You can also run **Actions → Update fonts → Run workflow** manually. A failed build does not update the release.
-
-A new content release is created only when the code, redistributable artwork, licence evidence or Unicode coverage data changes. An unchanged build retains the existing release date. A reference-catalogue-only change updates the workflow report without republishing identical fonts.
-
-The build preserves the source PNG bytes rather than tracing the artwork into COLR vectors. This keeps the original 3D appearance intact and avoids lossy conversion.
-
 ## Install
 
-Download `Fluent3D-fonts.tar.gz` from the [latest release](https://github.com/soizo/fluent-3d-emoji-font/releases/latest), then extract it to retain the fonts, licences, provenance manifest and checksums together.
+### Dependencies
+
+Use Python 3.13 and internet access. Allow several GB of disk space and memory for the original PNGs and four large colour-font files. Run these commands from the repository root:
 
 ```sh
-curl -LO https://github.com/soizo/fluent-3d-emoji-font/releases/latest/download/Fluent3D-fonts.tar.gz
-tar -xzf Fluent3D-fonts.tar.gz
+python3.13 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e '.[test]'
+python -m pytest -q
 ```
 
-If you download an individual font file, retain the licence notices from the archive. The licence text is also embedded in font name record 13.
+Build the selected Emojipedia catalogue locally, acknowledging that the artwork has not been cleared for redistribution:
 
-- **macOS:** double-click `Fluent3D-sbix.ttf`, select **Install Font**, then choose **Fluent 3D Community** in an application that supports custom fonts.
-- **Windows:** right-click a suitable TTF and select **Install**.
-- **Linux:** place a suitable TTF in `~/.local/share/fonts/`, then run `fc-cache -f`.
+```sh
+fluent-font --allow-unverified-local --output dist/local
+```
 
-The sbix font is named **Fluent 3D Community**; the SVG alternative is named **Fluent 3D Community SVG**. They have distinct PostScript names and may be installed together. For Obsidian and other Electron applications on macOS, choose the sbix font.
+The output directory must be empty. Use a different directory for each build. Original images and HTTP validators are cached in `work/emojipedia-assets/`; no Microsoft Git checkout is needed.
 
-If you installed a 0.1 release, replace it with version 0.2 or later and restart the application. Version 0.1 contained empty glyph bounds: some renderers reserved the correct width but painted no image. Version 0.2 supplies non-painting bounds contours and correct bitmap placement, preserving the original PNGs.
+- **macOS:** open the generated `Fluent3D-sbix.ttf` in Font Book and install it. Choose **Fluent 3D Community** in the target application.
+- **Windows:** install the SVG TTF only in applications that support OpenType-SVG with embedded PNGs.
+- **Linux:** copy a supported TTF to `~/.local/share/fonts/` and run `fc-cache -f`.
+
+The sbix and SVG variants have distinct family and PostScript names, so they can be installed together. For Obsidian and other Electron applications on macOS, select the **sbix** family. Replace older installed versions and restart applications if their font caches retain old data.
 
 ## Usage
 
-The font does not replace Apple Color Emoji or Segoe UI Emoji automatically. Select **Fluent 3D Community** in an application that permits font selection, then test a representative set:
+Check both familiar and newly added artwork:
 
 ```text
-😀 👩🏻‍💻 🏳️‍🌈 1️⃣ ❤️ 🏴
+😀 🕵🏽‍♀️ 😍 🥲 👩🏻‍💻 🏳️‍🌈 1️⃣ ❤️ 🌚 🫪
 ```
 
-Some applications force their system emoji font. Sequences missing from the licensed artwork set may also fall back to the system font; see `manifest.json` in the release for the exact coverage.
+The font does not replace the system emoji font automatically. Some applications require explicit font selection. Unsupported sequences may fall back to system artwork; the manifest reports actual coverage separately.
 
-For the web, choose the format supported by your target browser and renderer:
+For a web renderer with sbix support:
+
+```sh
+fonttools subset dist/local/Fluent3D-sbix.ttf \
+  --text="😀 🕵🏽‍♀️ 😍 🥲 👩🏻‍💻 🏳️‍🌈 1️⃣ ❤️ 🌚 🫪" \
+  --output-file=dist/local/Fluent3D-custom.woff2 --flavor=woff2 --retain-gids
+```
+
+Use the actual text your page needs. Subsetting removes unused glyphs, preserving the selected PNGs at their original resolution. Full-resolution fonts can exceed Chromium's 128 MB web-font decoding limit; install the full TTF for desktop use and use a suitable subset for web embedding. The source renderer's [limit is documented in Chromium](https://chromium.googlesource.com/chromium/src/+/c30907edb428e4185390d4c606510c65da38ab06/third_party/blink/renderer/platform/fonts/web_font_decoder.cc).
 
 ```css
 @font-face {
   font-family: "Fluent 3D Community";
-  src: url("./Fluent3D-sbix.woff2") format("woff2");
+  src: url("./Fluent3D-custom.woff2") format("woff2");
   font-display: swap;
 }
 
@@ -73,92 +84,71 @@ For the web, choose the format supported by your target browser and renderer:
 }
 ```
 
-WOFF2 is a compression container; it does not add support for the underlying colour-font table. Test the chosen file in every browser and operating system you intend to support.
-
 ### CLI
 
-The `fluent-font` command discovers the latest reference release, inventories a clean checkout of Microsoft's official artwork, builds all formats and validates every mapping:
+The default command audits the selected images and their rights evidence:
 
 ```sh
-fluent-font --upstream work/upstream --output dist
+fluent-font --output dist/audit
 ```
 
-The output directory must be empty to prevent stale release files from being mixed into a new build.
+If rights evidence is incomplete, it writes `manifest.json` and `STATUS.md` without producing or publishing fonts. With complete, matching evidence, it builds and validates the full catalogue. It never builds a silently substituted or incomplete subset.
 
-## Formats and compatibility
+## Formats and rendering
 
-| File | Recommended use | Limitations |
+| File | Intended use | Limitations |
 | --- | --- | --- |
-| `Fluent3D-sbix.ttf` | macOS Font Book and CoreText applications | Preferred on macOS; application font selection and system fallback affect the result |
-| `Fluent3D-svg.ttf` | Applications with OpenType-SVG support, including some Windows and Linux applications | Support depends on the renderer, including support for PNG images embedded in SVG |
-| `Fluent3D-sbix.woff2` | Web renderers that support sbix in WOFF2 | WOFF2 compression does not add sbix support |
-| `Fluent3D-svg.woff2` | Web renderers that support OpenType-SVG in WOFF2 | Verify in the target browser; this is not a universal Chromium solution |
+| `Fluent3D-sbix.ttf` | macOS CoreText and supporting Chromium/Electron applications | Preferred for Obsidian on macOS |
+| `Fluent3D-svg.ttf` | Applications supporting OpenType-SVG and embedded PNGs | Select the separate **Fluent 3D Community SVG** family |
+| `Fluent3D-sbix.woff2` | Web renderers supporting sbix in WOFF2 | WOFF2 compression does not add sbix support |
+| `Fluent3D-svg.woff2` | Web renderers supporting OpenType-SVG in WOFF2 | Test the target browser; this is not universal Chromium support |
 
-CBDT/CBLC is not currently generated, so renderers that require it are not guaranteed to work. macOS Chromium/Electron can use the sbix font. Release checks cover native CoreText and actual Chromium canvas pixels at five sizes, including skin-tone and ZWJ sequences; shaping alone does not count as a rendering pass. Other operating systems have not received equivalent real-device rendering certification.
+CBDT/CBLC is not currently generated. FontGoggles renders outlines and COLR fonts but does not display these sbix PNG or OpenType-SVG images. Use a supporting application to inspect the original 3D artwork.
 
-FontGoggles currently renders outlines and COLR fonts, but does not display these sbix PNG or OpenType-SVG images. A blank preview there does not establish that a bitmap font is broken. Use a supporting application or the release workflow's CoreText and Chromium previews to inspect the original 3D artwork.
+Version 0.1 had empty glyph bounds, which caused some renderers to reserve width but paint nothing. Non-painting bounds contours and corrected sbix origins fix that issue. Native CoreText checks and Chromium pixel checks now verify visible colour at multiple sizes, including new moon face (`🌚`, U+1F31A) and distorted face (`🫪`, U+1FAEA).
 
-Source PNGs are embedded without scaling or re-encoding. Rendering above the artwork's native resolution remains subject to normal bitmap limitations.
+PNG bytes are embedded without scaling or re-encoding. Rendering above their native resolution remains subject to bitmap limitations. A source with a new resolution requires an explicit strike design rather than silent resampling or missing glyphs.
 
-## Local build
+## Source discovery and updates
 
-### Dependencies
+The public Emojipedia catalogue API supplies release names and dates. The build discovers the newest dated release, explicitly selects it and retrieves its full image list. It does not guess CDN identifiers, generate URLs from English names or permanently hard-code `473`.
 
-You need Python 3.13, Git, internet access and approximately 2 GB of free space. Run the following commands from the repository root:
+Image filenames are cross-checked against the independent `emoji.code` field. This handles skin tones, ZWJ sequences, flags, tag sequences and legacy filenames with duplicated skin-tone suffixes. Unknown naming patterns, conflicting mappings or incomplete downloads stop the build.
 
-```sh
-python3.13 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e '.[test]'
-python -m pytest -q
-git clone --depth 1 https://github.com/microsoft/fluentui-emoji.git work/upstream
-fluent-font --upstream work/upstream --output dist
-```
+Every source is recorded with its exact URL, native dimensions, PNG hash and decoded-pixel hash. Conditional HTTP requests use ETag or Last-Modified values to detect revisions at unchanged URLs. Cache entries are validated before reuse. A changed image creates a new content identity; a changed check date alone does not.
 
-The Microsoft artwork checkout must be clean. If you reuse an existing checkout, update it to the latest official `main` branch first. Use a new empty output directory for every build.
+GitHub Actions checks daily at 02:17 UTC and supports **Actions → Update fonts → Run workflow**. Scheduled runs may be delayed or suspended by GitHub on inactive repositories. Public CI caches only the metadata index, never unverified artwork or fonts. See the [source investigation](docs/UPSTREAM.md).
 
-Fonts are byte-for-byte reproducible when the source version, code, Unicode inputs and pinned dependencies are unchanged. Reproducibility across differing operating systems or dependency environments is not guaranteed. Dependencies are pinned, and Dependabot proposes tested upgrades.
+## Coverage and quality
 
-## Discovery, mapping and quality
+The latest Unicode `emoji-test.txt` provides the coverage denominator. Non-RGI catalogue sequences are retained and reported separately. Qualification aliases are limited to forms listed by Unicode; no unsupported artwork is invented.
 
-The public Emojipedia catalogue API supplies release names and dates. The build selects the newest dated release, then retrieves its full artwork list. It does not guess CDN identifiers, derive URLs from English names or hard-code asset-set identifier `473`. The API is not a stability guarantee; an unexpected response fails the build. See the [upstream investigation](docs/UPSTREAM.md) for details.
+Each output is reopened and every mapping is shaped with HarfBuzz. Embedded PNGs are compared byte-for-byte with their downloaded sources. Glyph bounds must be non-empty and match bitmap placement. The required regression characters include `🌚` and `🫪`; system fallback is not counted as font coverage.
 
-Official Microsoft `metadata.json` files provide `unicode` and `unicodeSkintones` mappings, including the default artwork and five skin-tone variants. The build does not infer modifier positions from filenames. Candidate image sequences are cross-checked against the independent `emoji.code` field, including paths with duplicated skin-tone suffixes. Unknown naming patterns and conflicting mappings fail the build.
+Build manifests distinguish catalogue size, downloaded artwork, actual font coverage and pending redistribution evidence. A successful source audit does not mean a font was built or released. Coverage alone is not a claim that older artwork matches a newer reference.
 
-The latest official Unicode `emoji-test.txt` supplies the coverage denominator. Non-RGI artwork is retained and reported separately. Qualification aliases are created only for variation-selector forms explicitly listed by Unicode; the build does not invent unsupported mixed-tone or family sequences.
+## Automatic publication
 
-Fonts include `cmap` and GSUB `rlig` tables. Long sequences take priority so that ZWJ sequences, skin tones, flags, keycaps and tag sequences shape correctly. Every released format is reopened and checked with HarfBuzz, and every embedded image is compared byte-for-byte with its source PNG. These checks validate font structure and mappings but do not replace platform-specific CoreText or DirectWrite rendering tests.
+After matching rights evidence is supplied for every selected image, the workflow automatically builds the complete catalogue, validates shaping and original image bytes, runs native and browser rendering checks, and publishes a content-addressed GitHub Release.
 
-Mixed source resolutions, empty images, licence changes, download failures, unknown directory structures, duplicate mappings, conflicts and shaping errors all prevent publication.
+Local unverified builds include `NOT-FOR-REDISTRIBUTION.txt` and an explicit notice in font name record 13. They are never uploaded by the public workflow. The code's MIT licence is not attached to the artwork as a substitute for missing permission. See the [rights evidence process](docs/LICENSING.md).
 
-## Release contents
-
-Each release contains:
-
-- `manifest.json`: source URLs, the official commit, reference release, source-file and pixel SHA-256 hashes, Unicode version, coverage and every missing sequence;
-- `SHA256SUMS`: checksums for fonts, manifests, Unicode data and licence files;
-- `RELEASE.md`: coverage for that content version and the gap caused by unverified redistribution rights;
-- `emoji-test.txt` and `licenses/`: the rebuild input and required licence notices;
-- four font files and `Fluent3D-fonts.tar.gz` containing the complete release bundle.
-
-A new catalogue release does not prove that older character artwork is unchanged. Each check hashes every PNG in Microsoft's official repository. Artwork approved from another source is downloaded again and compared with the hash bound to its licence evidence; an in-place change blocks publication pending review. Unapproved CDN images are not downloaded, so the project does not claim visual parity between those images and older official artwork.
+Completed font builds contain four font files, `manifest.json`, `SHA256SUMS`, `RELEASE.md`, the exact Unicode input and applicable notices. Failed checks do not update a release.
 
 ## Contributing
 
-Questions and bug reports are welcome in [GitHub Issues](https://github.com/soizo/fluent-3d-emoji-font/issues). Pull requests are accepted for mapping fixes, renderer test results, documentation improvements and verifiable rights-holder licence evidence.
-
-Run the test suite before opening a pull request:
+Questions, bugs, mapping fixes, renderer results and verifiable rights-holder evidence are welcome through [GitHub Issues](https://github.com/soizo/fluent-3d-emoji-font/issues) and pull requests.
 
 ```sh
 python -m pytest -q
 ```
 
-New artwork without confirmed redistribution and font-embedding rights may be recorded only as a candidate. It must not be added to a public font. Follow the evidence and approval process in [Licensing](docs/LICENSING.md).
+For macOS rendering checks, use `scripts/check_macos.swift`. The browser check uses `scripts/check_browser.cjs` with Playwright 1.62.1. Do not commit downloaded images, local fonts or unverified rights claims.
 
 ## Licence
 
 Project code: [MIT](LICENSE), copyright © 2026 soizo.
 
-Microsoft's official artwork is distributed under Microsoft's separate [MIT licence](licenses/Microsoft-MIT.txt). Unicode data is distributed under the [Unicode License v3](licenses/Unicode.txt). Emojipedia catalogue information and vendor artwork are not covered by the project code licence. See [Licensing](docs/LICENSING.md) for the full boundary and approval process.
+Microsoft emoji artwork and material obtained through Emojipedia retain their respective rights holders' copyright. Redistribution and font-embedding rights must be verified independently. The Microsoft MIT notice retained for historical releases does not automatically cover CDN artwork used by the current pipeline.
 
-Microsoft, Windows and Fluent are trade marks of their respective owners. This project is not affiliated with Microsoft or Emojipedia.
+Unicode data uses [Unicode License v3](licenses/Unicode.txt). Read [Licensing](docs/LICENSING.md) for the full boundary. This project is not affiliated with Microsoft or Emojipedia.

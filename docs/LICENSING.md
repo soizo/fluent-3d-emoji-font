@@ -1,37 +1,36 @@
-# 授权边界
+# Licensing and source boundaries
 
-代码使用根目录 MIT License。字体名 Fluent 3D Community，不冒充微软官方字体。
-微软官方仓库中的 PNG 使用随其发布的 MIT 许可证，保留 Microsoft Corporation 版权声明：
-https://github.com/microsoft/fluentui-emoji/blob/main/LICENSE
-构建时逐字节核对已经审阅的许可证；变更时停止。Release 同时携带许可证和精确来源 commit。许可文本也嵌入字体的 name ID 13，以便单独下载字体时保留通知。
+The project code is MIT-licensed. This does not license Microsoft emoji artwork, Emojipedia material or any downloaded image.
 
-Emojipedia 是最新素材的参考目录和候选来源。它不是厂商图案的授权人：
-https://emojipedia.org/licensing
-CDN 可访问、路径在 microsoft-3D-fluent 下、视觉与旧 MIT 图案相似，都不构成新图案可再分发的证据。
-默认仅查询目录，不批量下载、提交或发布这些未确认的图片。
-网站的访问条款和图案的版权是不同问题。robots.txt 不是版权许可证，也不是长期的抓取许可。
-若站点拒绝访问、接口改变或返回错误，任务失败；不绕过验证或访问限制。
+Version 0.3 and later use only the selected **Emojipedia Microsoft 3D Fluent catalogue** as the image source. Older images from Microsoft's Git repository are not substituted for missing or unapproved catalogue images. The Microsoft MIT notice retained in this repository documents historical releases; it is not evidence that a newer CDN image has the same licence.
 
-额外候选图案必须先在 licenses/ 下保存可核查的许可文本，并在 approvals.json 添加：
+Emojipedia's [licensing information](https://emojipedia.org/licensing) directs vendor-artwork licensing enquiries to the rights holders. A working CDN URL, a Microsoft path segment or similarity to an older image does not establish redistribution or font-embedding rights. Access rules and robots.txt are separate from image licensing; the tool does not bypass access restrictions.
+
+## Local builds
+
+The `--allow-unverified-local` option fetches the actual selected images and builds the complete font for local inspection. It is not a declaration that redistribution is permitted. The font carries an unverified-rights notice in name record 13, a restricted-embedding flag and `NOT-FOR-REDISTRIBUTION.txt`. No artwork is relabelled as MIT-licensed.
+
+The public workflow never uses this option. Until every selected image has matching rights evidence, it produces an audit report rather than fonts. Source images used for audits remain on the ephemeral runner; only the JSON metadata index is cached. Neither unverified artwork nor unverified fonts are uploaded as workflow artifacts or Release assets.
+
+## Rights evidence
+
+Store the relevant rights-holder permission text under `licenses/`, then add an entry to the JSON array in `licenses/approvals.json`:
 
 ```json
 {
   "sequence": "1faea",
-  "url": "https://em-content.zobj.net/source/.../distorted-face_1faea.png",
-  "sha256": "图案原文件 SHA256",
-  "license_id": "明确的许可证标识",
-  "license_file": "licenses/相应授权文件.txt",
-  "license_sha256": "授权文本 SHA256",
-  "evidence_url": "权利方授权证据的公开地址",
+  "url": "https://em-content.zobj.net/source/microsoft-3D-fluent/EXAMPLE-VERSION/distorted-face_1faea.png",
+  "sha256": "SHA-256 of the exact PNG",
+  "license_id": "Applicable licence identifier",
+  "license_file": "licenses/rights-holder-permission.txt",
+  "license_sha256": "SHA-256 of the permission text",
+  "evidence_url": "Publicly verifiable rights-holder permission URL",
   "redistribution_and_font_embedding": true
 }
 ```
 
-文件实际为 JSON 数组。不要把这个示例当作授权。许可必须允许图案再分发及字体嵌入；
-任何额外通知要求也应保存在许可文件中。每次构建重新下载已批准图案，核对哈希；
-同 URL 内容改变会阻止发布，直到审阅新文件。新 CDN 版本需要重新匹配 URL，不能泛化批准整个域名。
-若微软官方后续纳入对应新图案，可直接按官方仓库许可随下一次构建自动发布。
+This example is not permission. Review the actual terms, including redistribution, font embedding and required notices. An entry applies only to the recorded URL and image hash. New URLs or changed image content require new review; an entire CDN domain is never implicitly approved. Applicable permission texts are embedded in the font and included in the build output.
 
-Unicode 数据使用 Unicode License v3： https://www.unicode.org/license.txt
-Release 附带使用的 emoji-test.txt 和 Unicode 许可证；其列表用于覆盖率计算，不能据此授权厂商图案。
-Microsoft、Windows、Fluent 是相应权利方的商标。本项目无官方隶属关系。
+Every selected image must be approved before automatic public publication. A partial approval set does not cause the pipeline to switch to an older source or publish a misleading subset.
+
+Unicode coverage data uses [Unicode License v3](https://www.unicode.org/license.txt). Its licence does not grant rights to vendor artwork. Microsoft, Windows and Fluent are trade marks of their respective owners; the project is not affiliated with Microsoft or Emojipedia.

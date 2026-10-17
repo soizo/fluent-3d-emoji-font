@@ -10,7 +10,7 @@ precondition(args.count == 3, "Expected font path and output PNG")
 let provider = CGDataProvider(url: URL(fileURLWithPath: args[1]) as CFURL)!
 let graphicsFont = CGFont(provider)!
 let font = CTFontCreateWithGraphicsFont(graphicsFont, 90, nil, nil)
-let text = "😀👩🏻‍💻🏳️‍🌈1️⃣❤️"
+let text = "😀👩🏻‍💻🏳️‍🌈1️⃣❤️🌚🫪"
 let attrs: [NSAttributedString.Key: Any] = [NSAttributedString.Key(kCTFontAttributeName as String): font]
 let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attrs))
 let runs = CTLineGetGlyphRuns(line) as! [CTRun]
@@ -29,16 +29,16 @@ for run in runs {
     // Spaces may map to .notdef; emoji sequences must survive as five visible glyphs.
     visibleGlyphs += glyphs.filter { $0 != 0 }.count
 }
-precondition(visibleGlyphs == 5, "CoreText did not shape five emoji: \(visibleGlyphs)")
-let context = CGContext(data: nil, width: 640, height: 160, bitsPerComponent: 8, bytesPerRow: 0,
+precondition(visibleGlyphs == 7, "CoreText did not shape seven emoji: \(visibleGlyphs)")
+let context = CGContext(data: nil, width: 800, height: 160, bitsPerComponent: 8, bytesPerRow: 0,
                         space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
 context.setFillColor(CGColor(gray: 1, alpha: 1))
-context.fill(CGRect(x: 0, y: 0, width: 640, height: 160))
+context.fill(CGRect(x: 0, y: 0, width: 800, height: 160))
 context.textPosition = CGPoint(x: 32, y: 48)
 CTLineDraw(line, context)
 // A successful shape is insufficient: every emoji cell must paint colour.
 let pixels = context.data!.assumingMemoryBound(to: UInt8.self)
-for cell in 0..<5 {
+for cell in 0..<7 {
     var coloured = 0
     for y in 0..<160 {
         for x in (32 + cell * 90)..<(32 + (cell + 1) * 90) {
@@ -53,4 +53,4 @@ let image = context.makeImage()!
 let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: args[2]) as CFURL, UTType.png.identifier as CFString, 1, nil)!
 CGImageDestinationAddImage(dest, image, nil)
 precondition(CGImageDestinationFinalize(dest))
-print("CoreText: five emoji have non-empty bounds and painted colour pixels; preview saved")
+print("CoreText: seven emoji, including new moon face and distorted face, have bounds and colour pixels")

@@ -3,10 +3,9 @@ import hashlib
 import io
 import json
 import re
-import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from urllib.parse import quote
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -163,35 +162,70 @@ def image_info(data):
                 'pixel_sha256': digest(rgba.tobytes())}
 
 
-def official_inventory(root):
-    commit = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
-    dirty = subprocess.check_output(['git', '-C', str(root), 'status', '--porcelain'], text=True)
-    if dirty:
-        raise ValueError('Official upstream checkout must be clean')
-    license_data = (root / 'LICENSE').read_bytes()
-    # Require the reviewed upstream license, including its copyright notice.
-    reviewed = Path('licenses/Microsoft-MIT.txt').read_bytes()
-    if license_data != reviewed:
-        raise ValueError('Upstream license changed; review required')
-    tones = ['Default', 'Light', 'Medium-Light', 'Medium', 'Medium-Dark', 'Dark']
+def download_catalogue(catalogue, cache, workers=8, audit_only=False):
+    """Fetch exactly the selected Emojipedia artwork; never substitute other art.
+
+    Conditional HTTP requests detect in-place revisions without re-downloading
+    unchanged images. Every cached file is verified before a 304 is accepted.
+    Downloading an image does not grant rights to redistribute it.
+    """
+    cache.mkdir(parents=True, exist_ok=True)
+    index_path = cache / 'images.json'
+    index = json.loads(index_path.read_text()) if index_path.exists() else {}
+    updated = dict(index)
+
+    def fetch(item):
+        seq, candidate = item
+        old = index.get(seq, {})
+        sha = old.get('sha256', '')
+        valid_metadata = (old.get('url') == candidate['url']
+                          and re.fullmatch('[0-9a-f]{64}', sha) is not None
+                          and re.fullmatch('[0-9a-f]{64}', old.get('pixel_sha256', '')) is not None
+                          and isinstance(old.get('width'), int) and isinstance(old.get('height'), int))
+        valid_cache = (valid_metadata
+                       and (cache / (sha + '.png')).is_file()
+                       and digest((cache / (sha + '.png')).read_bytes()) == sha)
+        headers = {}
+        if valid_cache or (audit_only and valid_metadata):
+            if old.get('etag'):
+                headers['If-None-Match'] = old['etag']
+            elif old.get('last_modified'):
+                headers['If-Modified-Since'] = old['last_modified']
+        response = get(candidate['url'], headers=headers)
+        if response.status_code == 304:
+            if not valid_cache and not (audit_only and valid_metadata):
+                raise ValueError(f'304 without valid cached artwork: {seq}')
+            raw = (cache / (sha + '.png')).read_bytes() if valid_cache else None
+        else:
+            raw = response.content
+        info = (image_info(raw) if raw is not None else
+                {k: old[k] for k in ['width', 'height', 'sha256', 'pixel_sha256']})
+        path = cache / (info['sha256'] + '.png')
+        if not audit_only and not path.exists():
+            path.write_bytes(raw)
+        entry = dict(url=candidate['url'], **info,
+                     etag=response.headers.get('ETag', old.get('etag', '')),
+                     last_modified=response.headers.get('Last-Modified', old.get('last_modified', '')))
+        return seq, dict(candidate, **info, path=str(path)), entry
+
     records = {}
-    for meta_path in sorted((root / 'assets').glob('*/metadata.json')):
-        meta = json.loads(meta_path.read_text())
-        paths = sorted(meta_path.parent.glob('**/3D/*.png'))
-        expected = meta.get('unicodeSkintones')
-        if len(paths) != (6 if expected else 1):
-            raise ValueError(f'Unexpected asset layout: {meta_path}')
-        for path in paths:
-            value = expected[tones.index(path.parent.parent.name)] if expected else meta['unicode']
-            seq = key(sequence(value))
-            if seq in records:
-                raise ValueError(f'Duplicate official sequence: {seq}')
-            raw = path.read_bytes()
-            info = image_info(raw)
-            rel = path.relative_to(root).as_posix()
-            records[seq] = dict(sequence=seq, source='microsoft-git', rights='MIT', path=str(path),
-                                url=f'https://raw.githubusercontent.com/microsoft/fluentui-emoji/{commit}/{quote(rel)}',
-                                upstream_commit=commit, **info)
-    if not records:
-        raise ValueError('No official assets')
-    return commit, records
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(fetch, item) for item in sorted(catalogue['records'].items())]
+            try:
+                for future in as_completed(futures):
+                    seq, record, entry = future.result()
+                    records[seq] = record
+                    updated[seq] = entry
+                    if len(records) % 100 == 0:
+                        index_path.write_bytes(canonical(updated))
+                        print(f'Emojipedia artwork: {len(records)}/{len(futures)}', flush=True)
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+    finally:
+        index_path.write_bytes(canonical(updated))
+    if set(records) != set(catalogue['records']):
+        raise ValueError('Incomplete Emojipedia download; refusing a partial font')
+    return dict(sorted(records.items()))
