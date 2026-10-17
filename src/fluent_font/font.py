@@ -9,7 +9,7 @@ import uharfbuzz as hb
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
-from fontTools.ttLib import TTFont, newTable
+from fontTools.ttLib import TTFont, newTable, woff2
 from fontTools.ttLib.tables.sbixGlyph import Glyph
 from fontTools.ttLib.tables.sbixStrike import Strike
 from fontTools.ttLib.tables.S_V_G_ import SVGDocument
@@ -34,6 +34,26 @@ class LinearStrike(Strike):
         self.data = (struct.pack('>HH', self.ppem, self.resolution)
                      + struct.pack('>' + 'I' * len(offsets), *offsets)
                      + b''.join(chunks))
+
+
+def save_font(font, path):
+    if font.flavor != 'woff2':
+        font.save(path)
+        return
+    # fontTools 4.60.1 has no WOFF2 quality parameter. Scope the adapter to
+    # this single-threaded save, preserving all other Brotli API operations.
+    # Quality 5 is still lossless; PNG data gains little from quality 11.
+    previous = woff2.brotli
+    class FastLosslessBrotli:
+        def __getattr__(self, name):
+            return getattr(previous, name)
+        def compress(self, data, **kwargs):
+            return previous.compress(data, quality=5, **kwargs)
+    try:
+        woff2.brotli = FastLosslessBrotli()
+        font.save(path)
+    finally:
+        woff2.brotli = previous
 
 
 def glyph_name(seq):
@@ -113,7 +133,7 @@ def build(records, aliases, output, identity):
     for flavor, suffix in [(None, 'ttf'), ('woff2', 'woff2')]:
         font.flavor = flavor
         path = output / f'Fluent3D-sbix.{suffix}'
-        font.save(path)
+        save_font(font, path)
         paths.append(path)
     font.flavor = None
     del font['sbix']
@@ -132,7 +152,7 @@ def build(records, aliases, output, identity):
     for flavor, suffix in [(None, 'ttf'), ('woff2', 'woff2')]:
         font.flavor = flavor
         path = output / f'Fluent3D-svg.{suffix}'
-        font.save(path)
+        save_font(font, path)
         paths.append(path)
     return paths
 

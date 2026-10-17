@@ -9,6 +9,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from PIL import Image
 
 VENDOR = "microsoft-3D-fluent"
@@ -20,6 +22,9 @@ QUERY = """query Inventory($slug: Slug!, $version: Slug) {
  vendorHistoric_v1(slug:$slug) { slug title date }
 }"""
 SESSION = requests.Session()
+SESSION.mount("https://", HTTPAdapter(max_retries=Retry(
+    total=3, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods={"GET", "POST"}, respect_retry_after_header=True)))
 SESSION.headers['User-Agent'] = 'Fluent3DFontSourceMonitor/0.1 (+https://github.com/soizo/fluent-3d-emoji-font)'
 
 

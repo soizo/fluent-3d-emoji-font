@@ -75,7 +75,9 @@ jobs:
         run: |
           set -euo pipefail
           # Differentiate a missing tag (404) from authentication/network failure.
+          exists=false
           if gh api "repos/$GH_REPO/releases/tags/$TAG" > release.json 2> error.txt; then
+            exists=true
             if [ "$(jq -r .draft release.json)" = false ]; then
               echo "Identical content already published: $TAG"
               exit 0
@@ -86,7 +88,7 @@ jobs:
           fi
           (cd dist && sha256sum -c SHA256SUMS)
           tar -czf Fluent3D-fonts.tar.gz -C dist .
-          if [ ! -s release.json ]; then
+          if [ "$exists" = false ]; then
             gh release create "$TAG" --draft --target "$COMMIT" \
               --title "Fluent 3D Community $TAG (licensed subset)" --notes-file dist/RELEASE.md
           fi
