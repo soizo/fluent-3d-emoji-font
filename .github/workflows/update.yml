@@ -1,0 +1,95 @@
+name: Update fonts
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: fonts-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      tag: ${{ steps.build.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: python -m pip install -e '.[test]'
+      - run: python -m pytest -q
+      - name: Fetch current official artwork
+        run: git clone --depth 1 https://github.com/microsoft/fluentui-emoji.git work/upstream
+      - name: Discover, build and validate
+        id: build
+        run: fluent-font --upstream work/upstream --output dist
+      - name: Summary
+        run: cat dist/RELEASE.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verified-fonts
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+  macos:
+    needs: build
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-fonts
+          path: dist
+      - name: Native CoreText smoke test
+        run: swift scripts/check_macos.swift dist/Fluent3D-sbix.ttf preview.png
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-preview
+          path: preview.png
+  release:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [build, macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: verified-fonts
+          path: dist
+      - name: Publish only new content
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.build.outputs.tag }}
+          COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Differentiate a missing tag (404) from authentication/network failure.
+          if gh api "repos/$GH_REPO/releases/tags/$TAG" > release.json 2> error.txt; then
+            if [ "$(jq -r .draft release.json)" = false ]; then
+              echo "Identical content already published: $TAG"
+              exit 0
+            fi
+          elif ! grep -q 'HTTP 404' error.txt; then
+            cat error.txt >&2
+            exit 1
+          fi
+          (cd dist && sha256sum -c SHA256SUMS)
+          tar -czf Fluent3D-fonts.tar.gz -C dist .
+          if [ ! -s release.json ]; then
+            gh release create "$TAG" --draft --target "$COMMIT" \
+              --title "Fluent 3D Community $TAG (licensed subset)" --notes-file dist/RELEASE.md
+          fi
+          gh release upload "$TAG" dist/*.ttf dist/*.woff2 dist/manifest.json \
+            dist/SHA256SUMS dist/RELEASE.md Fluent3D-fonts.tar.gz --clobber
+          gh release edit "$TAG" --draft=false --latest
