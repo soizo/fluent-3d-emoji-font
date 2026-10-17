@@ -33,4 +33,6 @@ This example is not permission. Review the actual terms, including redistributio
 
 Every selected image must be approved before automatic public publication. A partial approval set does not cause the pipeline to switch to an older source or publish a misleading subset.
 
+Version 0.4 was manually published at the maintainer's explicit request. This publication is not rights-holder permission: the artwork remains unverified, and the original local-build metadata, restricted-embedding flag and notices are retained. It does not approve any entry in `licenses/approvals.json` or bypass the scheduled workflow's rights checks.
+
 Unicode coverage data uses [Unicode License v3](https://www.unicode.org/license.txt). Its licence does not grant rights to vendor artwork. Microsoft, Windows and Fluent are trade marks of their respective owners; the project is not affiliated with Microsoft or Emojipedia.
