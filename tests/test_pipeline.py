@@ -30,6 +30,12 @@ def test_roundtrip_complex_sequences_and_lossless_images(tmp_path):
     with TTFont(paths[0]) as font:
         assert 'Permission is hereby granted' in font['name'].getDebugName(13)
         assert 'Microsoft Corporation' in font['name'].getDebugName(13)
+        for name in [f'u{c:X}' for c in [0x1f600]]:
+            glyph = font['glyf'][name]
+            assert glyph.xMax > glyph.xMin and glyph.yMax > glyph.yMin
+    with TTFont(paths[2]) as svg:
+        assert svg['name'].getDebugName(1) == 'Fluent 3D Community SVG'
+        assert svg['name'].getDebugName(6) == 'Fluent3DCommunitySVG-Regular'
     first = [p.read_bytes() for p in paths]
     assert [p.read_bytes() for p in build(records, aliases, tmp_path / 'fonts2', 'test')] == first
 
@@ -76,6 +82,21 @@ def test_mixed_resolutions_rejected(tmp_path):
     records = {'1f600': a, '1f601': b}
     with pytest.raises(ValueError, match='Mixed source resolutions'):
         build(records, mappings(records, {}), tmp_path / 'out', 'test')
+
+
+def test_tall_artwork_bounds_and_bitmap_origin(tmp_path):
+    from fontTools.ttLib import TTFont
+    path = tmp_path / 'tall.png'
+    Image.new('RGBA', (256, 264), 'red').save(path)
+    records = {'1f600': dict(path=str(path), **image_info(path.read_bytes()))}
+    aliases = mappings(records, {})
+    paths = build(records, aliases, tmp_path / 'fonts', 'tall')
+    assert validate(paths, records, aliases) == 4
+    with TTFont(paths[0]) as font:
+        glyph = font['glyf']['u1F600']
+        assert (glyph.xMin, glyph.yMin, glyph.xMax, glyph.yMax) == (0, -208, 1024, 848)
+        bitmap = font['sbix'].strikes[256].glyphs['u1F600']
+        assert (bitmap.originOffsetX, bitmap.originOffsetY) == (0, 0)
 
 
 def test_repeated_skin_tone_suffix_needs_independent_code():

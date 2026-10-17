@@ -60,6 +60,36 @@ def glyph_name(seq):
     return 'u' + '_'.join(f'{c:X}' for c in seq)
 
 
+def bitmap_bounds(record):
+    """Design-space bounds matching the PNG's original pixel-space placement."""
+    size = record['width']
+    bottom = -round(size * 192 / 1024) - (record['height'] - size) // 2
+    return (0, round(bottom * 1024 / size), 1024,
+            round((bottom + record['height']) * 1024 / size))
+
+
+def bounds_glyph(bounds):
+    # A two-point closed contour has a real bounding box but no filled area.
+    # Skia/CoreText otherwise discards empty glyf glyphs before drawing sbix.
+    # Avoid a filled rectangle, which would obscure artwork in outline renderers.
+    x_min, y_min, x_max, y_max = bounds
+    pen = TTGlyphPen(None)
+    pen.moveTo((x_min, y_min))
+    pen.lineTo((x_max, y_max))
+    pen.closePath()
+    return pen.glyph()
+
+
+def set_format_names(font, identity, svg=False):
+    family = 'Fluent 3D Community' + (' SVG' if svg else '')
+    ps_name = 'Fluent3DCommunity' + ('SVG' if svg else '') + '-Regular'
+    names = {1: family, 3: identity + (';svg' if svg else ';sbix'),
+             4: family + ' Regular', 6: ps_name}
+    for record in font['name'].names:
+        if record.nameID in names:
+            record.string = names[record.nameID].encode(record.getEncoding())
+
+
 def mappings(records, unicode_entries):
     result = {sequence(k): k for k in records}
     # Only Unicode-listed qualified/unqualified spellings of the same sequence.
@@ -82,13 +112,15 @@ def base_font(records, aliases, identity):
     builder = FontBuilder(1024, isTTF=True)
     builder.setupGlyphOrder(order)
     builder.setupCharacterMap(cmap)
-    builder.setupGlyf({g: TTGlyphPen(None).glyph() for g in order})
+    glyphs = {g: TTGlyphPen(None).glyph() for g in order}
+    glyphs.update({targets[k]: bounds_glyph(bitmap_bounds(record)) for k, record in records.items()})
+    builder.setupGlyf(glyphs)
     builder.setupHorizontalMetrics({g: (1024 if g in targets.values() else 0, 0) for g in order})
     builder.setupHorizontalHeader(ascent=848, descent=-208)
     builder.setupNameTable({'familyName': 'Fluent 3D Community', 'styleName': 'Regular',
                             'uniqueFontIdentifier': identity,
                             'fullName': 'Fluent 3D Community Regular',
-                            'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.100',
+                            'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.200',
                             'copyright': 'Artwork: Microsoft Corporation; see bundled source and license notices.',
                             'licenseDescription': '\n\n'.join(p.read_text() for p in sorted(Path('licenses').iterdir())
                                 if p.is_file() and p.suffix != '.json')})
@@ -97,6 +129,8 @@ def base_font(records, aliases, identity):
     builder.setupPost()
     builder.setupMaxp()
     font = builder.font
+    font['head'].fontRevision = 0.2
+    set_format_names(font, identity)
     font['head'].created = font['head'].modified = 2082844800  # 1970; reproducible builds
     font.recalcTimestamp = False
     rules = []
@@ -125,7 +159,9 @@ def build(records, aliases, output, identity):
         if size not in sbix.strikes:
             sbix.strikes[size] = LinearStrike(ppem=size, resolution=72)
         sbix.strikes[size].glyphs[targets[k]] = Glyph(glyphName=targets[k], graphicType='png ',
-                originOffsetX=0, originOffsetY=-round(size * 192 / 1024) - (info["height"]-size)//2, imageData=raw)
+                # With a glyf contour, sbix offsets are relative to its lower
+                # left corner. That corner already includes baseline placement.
+                originOffsetX=0, originOffsetY=0, imageData=raw)
     # Every strike must contain every emoji, never silently drop differently sized assets.
     if len(sbix.strikes) != 1:
         raise ValueError('Mixed source resolutions require explicit strike design; no implicit resampling')
@@ -138,6 +174,7 @@ def build(records, aliases, output, identity):
         paths.append(path)
     font.flavor = None
     del font['sbix']
+    set_format_names(font, identity, svg=True)
     svg = newTable('SVG ')
     svg.docList = []
     for k, record in records.items():
@@ -162,6 +199,11 @@ def validate(paths, records, aliases):
     checked = 0
     for path in paths:
         font = TTFont(path, recalcTimestamp=False)
+        for k, record in records.items():
+            glyph = font['glyf'][glyph_name(sequence(k))]
+            actual_bounds = (glyph.xMin, glyph.yMin, glyph.xMax, glyph.yMax)
+            if actual_bounds != bitmap_bounds(record):
+                raise ValueError(f'Empty or incorrect rendering bounds: {k}: {actual_bounds}')
         font.flavor = None
         buf = io.BytesIO()
         font.save(buf)

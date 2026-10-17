@@ -21,6 +21,11 @@ for run in runs {
     precondition(CTFontCopyPostScriptName(actualFont) == CTFontCopyPostScriptName(font), "Unexpected system fallback")
     var glyphs = [CGGlyph](repeating: 0, count: CTRunGetGlyphCount(run))
     CTRunGetGlyphs(run, CFRange(location: 0, length: 0), &glyphs)
+    var bounds = [CGRect](repeating: .zero, count: glyphs.count)
+    CTFontGetBoundingRectsForGlyphs(actualFont, .horizontal, &glyphs, &bounds, glyphs.count)
+    for (glyph, rect) in zip(glyphs, bounds) where glyph != 0 {
+        precondition(!rect.isEmpty, "Zero-area glyph bounds: \(glyph)")
+    }
     // Spaces may map to .notdef; emoji sequences must survive as five visible glyphs.
     visibleGlyphs += glyphs.filter { $0 != 0 }.count
 }
@@ -31,8 +36,21 @@ context.setFillColor(CGColor(gray: 1, alpha: 1))
 context.fill(CGRect(x: 0, y: 0, width: 640, height: 160))
 context.textPosition = CGPoint(x: 32, y: 48)
 CTLineDraw(line, context)
+// A successful shape is insufficient: every emoji cell must paint colour.
+let pixels = context.data!.assumingMemoryBound(to: UInt8.self)
+for cell in 0..<5 {
+    var coloured = 0
+    for y in 0..<160 {
+        for x in (32 + cell * 90)..<(32 + (cell + 1) * 90) {
+            let i = y * context.bytesPerRow + x * 4
+            let rgb = [Int(pixels[i]), Int(pixels[i + 1]), Int(pixels[i + 2])]
+            if rgb.max()! - rgb.min()! > 20 { coloured += 1 }
+        }
+    }
+    precondition(coloured > 50, "No colour pixels in emoji cell \(cell)")
+}
 let image = context.makeImage()!
 let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: args[2]) as CFURL, UTType.png.identifier as CFString, 1, nil)!
 CGImageDestinationAddImage(dest, image, nil)
 precondition(CGImageDestinationFinalize(dest))
-print("CoreText: five emoji shaped with custom font; preview saved")
+print("CoreText: five emoji have non-empty bounds and painted colour pixels; preview saved")

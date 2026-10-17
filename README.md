@@ -45,7 +45,9 @@ If you download an individual font file, retain the licence notices from the arc
 - **Windows:** right-click a suitable TTF and select **Install**.
 - **Linux:** place a suitable TTF in `~/.local/share/fonts/`, then run `fc-cache -f`.
 
-Do not install both TTF variants simultaneously because they share the same font name. Remove the installed variant and restart the target application before switching formats.
+The sbix font is named **Fluent 3D Community**; the SVG alternative is named **Fluent 3D Community SVG**. They have distinct PostScript names and may be installed together. For Obsidian and other Electron applications on macOS, choose the sbix font.
+
+If you installed a 0.1 release, replace it with version 0.2 or later and restart the application. Version 0.1 contained empty glyph bounds: some renderers reserved the correct width but painted no image. Version 0.2 supplies non-painting bounds contours and correct bitmap placement, preserving the original PNGs.
 
 ## Usage
 
@@ -92,7 +94,9 @@ The output directory must be empty to prevent stale release files from being mix
 | `Fluent3D-sbix.woff2` | Web renderers that support sbix in WOFF2 | WOFF2 compression does not add sbix support |
 | `Fluent3D-svg.woff2` | Web renderers that support OpenType-SVG in WOFF2 | Verify in the target browser; this is not a universal Chromium solution |
 
-CBDT/CBLC is not currently generated, so combinations of Android, Chromium and other renderers that require it are not guaranteed to work. The project includes a native macOS CoreText rendering smoke test; other platforms have not received equivalent real-device rendering certification.
+CBDT/CBLC is not currently generated, so renderers that require it are not guaranteed to work. macOS Chromium/Electron can use the sbix font. Release checks cover native CoreText and actual Chromium canvas pixels at five sizes, including skin-tone and ZWJ sequences; shaping alone does not count as a rendering pass. Other operating systems have not received equivalent real-device rendering certification.
+
+FontGoggles currently renders outlines and COLR fonts, but does not display these sbix PNG or OpenType-SVG images. A blank preview there does not establish that a bitmap font is broken. Use a supporting application or the release workflow's CoreText and Chromium previews to inspect the original 3D artwork.
 
 Source PNGs are embedded without scaling or re-encoding. Rendering above the artwork's native resolution remains subject to normal bitmap limitations.
 

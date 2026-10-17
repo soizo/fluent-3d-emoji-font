@@ -62,10 +62,17 @@ jobs:
           path: dist
       - name: Native CoreText smoke test
         run: swift scripts/check_macos.swift dist/Fluent3D-sbix.ttf preview.png
+      - name: Chromium pixel rendering regression
+        run: |
+          npm install --prefix work/browser-check --no-save playwright@1.62.1
+          work/browser-check/node_modules/.bin/playwright install chromium
+          NODE_PATH="$PWD/work/browser-check/node_modules" node scripts/check_browser.cjs dist/Fluent3D-sbix.ttf chromium-preview.png
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: macos-preview
-          path: preview.png
+          path: |
+            preview.png
+            chromium-preview.png
   release:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: [build, macos]

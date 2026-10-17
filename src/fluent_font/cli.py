@@ -70,9 +70,9 @@ def run(args):
                          approvals=approvals, licenses={p.name: digest(p.read_bytes())
                          for p in sorted(Path('licenses').glob('*')) if p.is_file()})
     identity = digest(canonical(identity_data))
-    tag = 'v0.1-' + identity[:20]
+    tag = 'v0.2-' + identity[:20]
     checked = datetime.now(timezone.utc).isoformat()
-    report = dict(schema_version=1, content_id=identity, tag=tag, checked_at=checked,
+    report = dict(schema_version=1, font_version='0.2.0', content_id=identity, tag=tag, checked_at=checked,
                   unicode_version=unicode_version, unicode_sha256=digest(unicode_raw),
                   microsoft_commit=commit, latest_reference=candidates['release'],
                   reference_asset_set_ids=candidates['asset_set_ids'],
@@ -96,6 +96,11 @@ def run(args):
     shutil.copyfile('LICENSE', out / 'CODE-LICENSE.txt')
     shutil.copyfile('docs/LICENSING.md', out / 'LICENSING.md')
     notes = (f'# Fluent 3D Community — {tag}\n\n'
+             'Rendering fix in 0.2: non-empty glyph bounds and corrected bitmap origins '
+             'fix invisible emoji in macOS Chromium/Electron applications, including Obsidian. '
+             'Replace the 0.1 font and restart the application to clear cached fonts. '
+             'Use Fluent 3D Community (sbix); the SVG alternative now has the distinct '
+             'family name Fluent 3D Community SVG.\n\n'
              f'Official Microsoft commit: `{commit}`.\n\n'
              f'Artwork: {len(records)}; Unicode Emoji {unicode_version} RGI coverage: '
              f'{len(required)-len(missing)}/{len(required)} ({report["rgi_coverage"]:.2%}).\n\n'
