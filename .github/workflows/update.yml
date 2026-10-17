@@ -61,7 +61,7 @@ jobs:
           path: work/emojipedia-assets/images.json
           key: emojipedia-${{ runner.os }}-${{ github.run_id }}
           restore-keys: emojipedia-${{ runner.os }}-
-      - name: Discover Emojipedia, check rights, build and validate
+      - name: Load selected source, build and validate
         id: build
         env:
           MANUAL_PUBLICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_unverified_artwork }}
@@ -80,11 +80,13 @@ jobs:
             gh release download "$SOURCE_CACHE_RELEASE" --pattern SourceSnapshot.tar.gz --pattern SourceSnapshot.sha256 --dir work/saved-source
             (cd work/saved-source && sha256sum -c SourceSnapshot.sha256)
             tar -xzf work/saved-source/SourceSnapshot.tar.gz -C work/saved-source
+            echo 'Saved source archive verified; building without upstream requests.'
             options+=(--source-manifest work/saved-source/snapshot/manifest.json
                       --cache work/saved-source/originals)
           fi
           fluent-font --output dist "${options[@]}"
           if [ "$REFRESH_UPSTREAM" != true ]; then
+            mkdir -p work/emojipedia-assets
             cp work/saved-source/originals/*.png work/emojipedia-assets/
           fi
       - name: Determine publication readiness without changing rights status
