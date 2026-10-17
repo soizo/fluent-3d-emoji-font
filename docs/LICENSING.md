@@ -3,7 +3,7 @@
 代码使用根目录 MIT License。字体名 Fluent 3D Community，不冒充微软官方字体。
 微软官方仓库中的 PNG 使用随其发布的 MIT 许可证，保留 Microsoft Corporation 版权声明：
 https://github.com/microsoft/fluentui-emoji/blob/main/LICENSE
-构建时逐字节核对已经审阅的许可证；变更时停止。Release 同时携带许可证和精确来源 commit。
+构建时逐字节核对已经审阅的许可证；变更时停止。Release 同时携带许可证和精确来源 commit。许可文本也嵌入字体的 name ID 13，以便单独下载字体时保留通知。
 
 Emojipedia 是最新素材的参考目录和候选来源。它不是厂商图案的授权人：
 https://emojipedia.org/licensing

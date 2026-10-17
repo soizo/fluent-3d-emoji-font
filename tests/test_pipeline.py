@@ -26,6 +26,10 @@ def test_roundtrip_complex_sequences_and_lossless_images(tmp_path):
     aliases = mappings(records, entries)
     paths = build(records, aliases, tmp_path / 'fonts', 'test')
     assert validate(paths, records, aliases) == len(paths) * len(aliases)
+    from fontTools.ttLib import TTFont
+    with TTFont(paths[0]) as font:
+        assert 'Permission is hereby granted' in font['name'].getDebugName(13)
+        assert 'Microsoft Corporation' in font['name'].getDebugName(13)
     first = [p.read_bytes() for p in paths]
     assert [p.read_bytes() for p in build(records, aliases, tmp_path / 'fonts2', 'test')] == first
 

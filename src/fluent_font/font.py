@@ -90,7 +90,8 @@ def base_font(records, aliases, identity):
                             'fullName': 'Fluent 3D Community Regular',
                             'psName': 'Fluent3DCommunity-Regular', 'version': 'Version 0.100',
                             'copyright': 'Artwork: Microsoft Corporation; see bundled source and license notices.',
-                            'licenseDescription': 'MIT official artwork; additional sources only as recorded in manifest.'})
+                            'licenseDescription': '\n\n'.join(p.read_text() for p in sorted(Path('licenses').iterdir())
+                                if p.is_file() and p.suffix != '.json')})
     builder.setupOS2(sTypoAscender=848, sTypoDescender=-208, usWinAscent=848,
                     usWinDescent=208, fsType=0)
     builder.setupPost()
