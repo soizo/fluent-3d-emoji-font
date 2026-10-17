@@ -10,7 +10,7 @@ Emojipedia's [licensing information](https://emojipedia.org/licensing) directs v
 
 The `--allow-unverified-local` option fetches the actual selected images and builds the complete font for local inspection. It is not a declaration that redistribution is permitted. The font carries an unverified-rights notice in name record 13, a restricted-embedding flag and `NOT-FOR-REDISTRIBUTION.txt`. No artwork is relabelled as MIT-licensed.
 
-The public workflow never uses this option. Until every selected image has matching rights evidence, it produces an audit report rather than fonts. Source images used for audits remain on the ephemeral runner; only the JSON metadata index is cached. Neither unverified artwork nor unverified fonts are uploaded as workflow artifacts or Release assets.
+Scheduled runs do not use this option. Until every selected image has matching rights evidence, they produce an audit report rather than fonts. Source images used for audits remain on the ephemeral runner; only the JSON metadata index is cached. A maintainer may explicitly select `publish_unverified_artwork` when manually starting the workflow. That run builds and tests the fonts in Actions and may upload the unverified build and publish a Release with its original rights notices. This input does not approve the images or change their licence status.
 
 ## Rights evidence
 
@@ -33,6 +33,6 @@ This example is not permission. Review the actual terms, including redistributio
 
 Every selected image must be approved before automatic public publication. A partial approval set does not cause the pipeline to switch to an older source or publish a misleading subset.
 
-Version 0.4 was manually published at the maintainer's explicit request. This publication is not rights-holder permission: the artwork remains unverified, and the original local-build metadata, restricted-embedding flag and notices are retained. It does not approve any entry in `licenses/approvals.json` or bypass the scheduled workflow's rights checks.
+An explicitly requested Actions publication is not rights-holder permission: the artwork remains unverified, and the original local-build metadata, restricted-embedding flag and notices are retained. It does not approve any entry in `licenses/approvals.json` or bypass the scheduled workflow's rights checks.
 
 Unicode coverage data uses [Unicode License v3](https://www.unicode.org/license.txt). Its licence does not grant rights to vendor artwork. Microsoft, Windows and Fluent are trade marks of their respective owners; the project is not affiliated with Microsoft or Emojipedia.

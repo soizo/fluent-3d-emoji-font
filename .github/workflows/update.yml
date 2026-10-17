@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '17 2 * * *'
   workflow_dispatch:
+    inputs:
+      publish_unverified_artwork:
+        description: 'Publish tested fonts with explicit unverified artwork-rights notices'
+        type: boolean
+        default: false
   push:
     branches: [main]
   pull_request:
@@ -31,6 +36,7 @@ jobs:
     outputs:
       tag: ${{ steps.build.outputs.tag }}
       publishable: ${{ steps.build.outputs.publishable }}
+      release_ready: ${{ steps.publication.outputs.ready }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -46,7 +52,29 @@ jobs:
           restore-keys: emojipedia-${{ runner.os }}-
       - name: Discover Emojipedia, check rights, build and validate
         id: build
-        run: fluent-font --output dist
+        env:
+          MANUAL_PUBLICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_unverified_artwork }}
+        run: |
+          if [ "$MANUAL_PUBLICATION" = true ]; then
+            fluent-font --allow-unverified-local --output dist
+          else
+            fluent-font --output dist
+          fi
+      - name: Determine publication readiness without changing rights status
+        id: publication
+        env:
+          RIGHTS_VERIFIED: ${{ steps.build.outputs.publishable }}
+          MANUAL_PUBLICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_unverified_artwork }}
+        run: |
+          ready=false
+          if [ "$RIGHTS_VERIFIED" = true ] || [ "$MANUAL_PUBLICATION" = true ]; then
+            test -s dist/Fluent3D-sbix.ttf
+            test -s dist/Fluent3D-svg.ttf
+            test -s dist/Fluent3D-sbix.woff2
+            test -s dist/Fluent3D-svg.woff2
+            ready=true
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         if: steps.artwork-cache.outputs.cache-matched-key != format('emojipedia-{0}-{1}', runner.os, steps.build.outputs.cache_key)
         with:
@@ -67,7 +95,7 @@ jobs:
           retention-days: 14
   macos:
     needs: build
-    if: needs.build.outputs.publishable == 'true'
+    if: needs.build.outputs.release_ready == 'true'
     runs-on: macos-14
     timeout-minutes: 10
     steps:
@@ -92,7 +120,7 @@ jobs:
             preview.png
             chromium-preview.png
   release:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.build.outputs.publishable == 'true'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.build.outputs.release_ready == 'true'
     needs: [build, macos]
     runs-on: ubuntu-24.04
     permissions:
@@ -102,12 +130,17 @@ jobs:
         with:
           name: source-report-or-verified-fonts
           path: dist
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: macos-preview
+          path: previews
       - name: Publish only new content
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.build.outputs.tag }}
           COMMIT: ${{ github.sha }}
+          MANUAL_PUBLICATION: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_unverified_artwork }}
         shell: bash
         run: |
           set -euo pipefail
@@ -125,10 +158,20 @@ jobs:
           fi
           (cd dist && sha256sum -c SHA256SUMS)
           tar -czf Fluent3D-fonts.tar.gz -C dist .
+          cp dist/RELEASE.md release-notes.md
+          if [ "$MANUAL_PUBLICATION" = true ]; then
+            printf '\n## Explicit manual publication\n\nThis release was built and tested entirely by GitHub Actions, then published at the maintainer’s explicit request. Artwork redistribution and font-embedding rights remain unverified. Original local-build metadata and restricted-embedding notices are retained; publication is not rights-holder permission. The project MIT licence covers code only.\n' >> release-notes.md
+          fi
           if [ "$exists" = false ]; then
             gh release create "$TAG" --draft --target "$COMMIT" \
-              --title "Fluent 3D Community $TAG (Emojipedia source)" --notes-file dist/RELEASE.md
+              --title "Fluent 3D Community $TAG (Emojipedia source)" --notes-file release-notes.md
           fi
-          gh release upload "$TAG" dist/*.ttf dist/*.woff2 dist/manifest.json \
-            dist/SHA256SUMS dist/RELEASE.md Fluent3D-fonts.tar.gz --clobber
-          gh release edit "$TAG" --draft=false --latest
+          assets=(dist/*.ttf dist/*.woff2 dist/manifest.json dist/SHA256SUMS dist/RELEASE.md
+                  dist/CODE-LICENSE.txt dist/LICENSING.md Fluent3D-fonts.tar.gz previews/*.png)
+          if [ -f dist/NOT-FOR-REDISTRIBUTION.txt ]; then
+            assets+=(dist/NOT-FOR-REDISTRIBUTION.txt)
+          fi
+          gh release upload "$TAG" "${assets[@]}" --clobber
+          sha256sum "${assets[@]}" | sed 's@  .*/@  @' > RELEASE-SHA256SUMS.txt
+          gh release upload "$TAG" RELEASE-SHA256SUMS.txt --clobber
+          gh release edit "$TAG" --notes-file release-notes.md --draft=false --latest

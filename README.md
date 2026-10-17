@@ -12,7 +12,7 @@ Artwork redistribution rights are currently unverified. A local build can includ
 
 [Latest release](https://github.com/soizo/fluent-3d-emoji-font/releases/latest) · [Source-check reports](https://github.com/soizo/fluent-3d-emoji-font/actions) · [Questions and reports](https://github.com/soizo/fluent-3d-emoji-font/issues)
 
-Version 0.4 is a maintainer-authorised manual publication of the tested 473×473 build. Artwork rights remain unverified; publication does not grant a licence to the artwork. The original build metadata and restricted-embedding notices are retained. Scheduled publication still requires matching rights evidence for every image.
+The 473×473 release is built, tested and published by GitHub Actions. A maintainer can explicitly request publication with unverified artwork rights using the workflow's manual input; publication does not grant a licence to the artwork. The original build metadata and restricted-embedding notices are retained. Scheduled publication still requires matching rights evidence for every image.
 
 Historical 0.1 and 0.2 releases used Microsoft's older open-source artwork. They do **not** represent the current Emojipedia-source pipeline. In particular, the older new moon face has closed eyes; the current reference has half-open eyes.
 
@@ -133,7 +133,7 @@ Build manifests distinguish catalogue size, downloaded artwork, actual font cove
 
 After matching rights evidence is supplied for every selected image, the workflow automatically builds the complete catalogue, validates shaping and cropped image bytes, runs native and browser rendering checks, and publishes a content-addressed GitHub Release.
 
-Local unverified builds include `NOT-FOR-REDISTRIBUTION.txt` and an explicit notice in font name record 13. They are never uploaded by the public workflow. The code's MIT licence is not attached to the artwork as a substitute for missing permission. See the [rights evidence process](docs/LICENSING.md).
+Unverified builds include `NOT-FOR-REDISTRIBUTION.txt` and an explicit notice in font name record 13. Scheduled runs do not upload them. For an explicit maintainer-authorised publication, select **Actions → Update fonts → Run workflow → Publish tested fonts with explicit unverified artwork-rights notices**. GitHub Actions then downloads the selected catalogue, crops and builds all four fonts, validates every mapping, runs macOS and Chromium rendering tests, and publishes only after those jobs succeed. It does not upload a developer's existing font files or change the artwork's rights status. The code's MIT licence is not attached to the artwork as a substitute for missing permission. See the [rights evidence process](docs/LICENSING.md).
 
 Completed font builds contain four font files, `manifest.json`, `SHA256SUMS`, `RELEASE.md`, the exact Unicode input and applicable notices. Failed checks do not update a release.
 
